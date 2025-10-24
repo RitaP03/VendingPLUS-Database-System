@@ -1,0 +1,771 @@
+/*==============================================================*/
+/* DBMS name:      ORACLE Version 11g                           */
+/* Created on:     08/03/2025 15:21:54                          */
+/*==============================================================*/
+
+
+alter table APRESENTA
+   drop constraint FK_APRESENT_REFERENCE_ESTADO;
+
+alter table APRESENTA
+   drop constraint FK_APRESENT_REFERENCE_MAQUINA;
+
+alter table ARRANJA
+   drop constraint FK_ARRANJA_ARRANJA_FUNCIONA;
+
+alter table ARRANJA
+   drop constraint FK_ARRANJA_ARRANJA2_MAQUINA;
+
+alter table COBRE
+   drop constraint FK_COBRE_COBRE_ROTA;
+
+alter table COBRE
+   drop constraint FK_COBRE_COBRE2_MAQUINA;
+
+alter table COMPARTIMENTO
+   drop constraint FK_COMPARTI_CONFIGURA_MAQUINA;
+
+alter table COMPARTIMENTO
+   drop constraint FK_COMPARTI_CONTEM_PRODUTO;
+
+alter table CONSTA
+   drop constraint FK_CONSTA_REFERENCE_VIAGEM;
+
+alter table CONSTA
+   drop constraint FK_CONSTA_REFERENCE_VEICULOS;
+
+alter table CONSTITUI
+   drop constraint FK_CONSTITU_CONSTITUI_PRODUTO;
+
+alter table CONSTITUI
+   drop constraint FK_CONSTITU_CONSTITUI_ENCOMEND;
+
+alter table FAZ
+   drop constraint FK_FAZ_FAZ_FUNCIONA;
+
+alter table FAZ
+   drop constraint FK_FAZ_FAZ2_VIAGEM;
+
+alter table GUARDA
+   drop constraint FK_GUARDA_GUARDA_ARMAZEM;
+
+alter table GUARDA
+   drop constraint FK_GUARDA_GUARDA2_PRODUTO;
+
+alter table INCLUI
+   drop constraint FK_INCLUI_INCLUI_MAQUINA;
+
+alter table INCLUI
+   drop constraint FK_INCLUI_INCLUI2_PRODUTO;
+
+alter table INFLUENCIA
+   drop constraint FK_INFLUENC_INFLUENCI_VENDA;
+
+alter table INFLUENCIA
+   drop constraint FK_INFLUENC_INFLUENCI_ARMAZEM;
+
+alter table PEDE
+   drop constraint FK_PEDE_REFERENCE_ENCOMEND;
+
+alter table PEDE
+   drop constraint FK_PEDE_REFERENCE_ARMAZEM;
+
+alter table PRODUTO
+   drop constraint FK_PRODUTO_ASSOCIADO_VENDA;
+
+alter table REGISTA
+   drop constraint FK_REGISTA_REFERENCE_VENDA;
+
+alter table REGISTA
+   drop constraint FK_REGISTA_REFERENCE_MAQUINA;
+
+alter table REPOE
+   drop constraint FK_REPOE_REPOE_VIAGEM;
+
+alter table REPOE
+   drop constraint FK_REPOE_REPOE2_PRODUTO;
+
+alter table SEGUE
+   drop constraint FK_SEGUE_REFERENCE_ROTA;
+
+alter table SEGUE
+   drop constraint FK_SEGUE_REFERENCE_VIAGEM;
+
+alter table VEICULOS
+   drop constraint FK_VEICULOS_TEM_ARMAZEM;
+
+alter table VISITA
+   drop constraint FK_VISITA_REFERENCE_PRODUTO;
+
+alter table VISITA
+   drop constraint FK_VISITA_VISITA_MAQUINA;
+
+alter table VISITA
+   drop constraint FK_VISITA_VISITA2_VIAGEM;
+
+drop table APRESENTA cascade constraints;
+
+drop table ARMAZEM cascade constraints;
+
+drop index ARRANJA2_FK;
+
+drop index ARRANJA_FK;
+
+drop table ARRANJA cascade constraints;
+
+drop index COBRE2_FK;
+
+drop index COBRE_FK;
+
+drop table COBRE cascade constraints;
+
+drop index CONTEM_FK;
+
+drop index CONFIGURA_FK;
+
+drop table COMPARTIMENTO cascade constraints;
+
+drop table CONSTA cascade constraints;
+
+drop index CONSTITUI2_FK;
+
+drop index CONSTITUI_FK;
+
+drop table CONSTITUI cascade constraints;
+
+drop table ENCOMENDA cascade constraints;
+
+drop table ESTADO cascade constraints;
+
+drop index FAZ2_FK;
+
+drop index FAZ_FK;
+
+drop table FAZ cascade constraints;
+
+drop table FUNCIONARIO cascade constraints;
+
+drop index GUARDA2_FK;
+
+drop index GUARDA_FK;
+
+drop table GUARDA cascade constraints;
+
+drop index INCLUI2_FK;
+
+drop index INCLUI_FK;
+
+drop table INCLUI cascade constraints;
+
+drop index INFLUENCIA2_FK;
+
+drop index INFLUENCIA_FK;
+
+drop table INFLUENCIA cascade constraints;
+
+drop table MAQUINA cascade constraints;
+
+drop table PEDE cascade constraints;
+
+drop index ASSOCIADO2_FK;
+
+drop table PRODUTO cascade constraints;
+
+drop table REGISTA cascade constraints;
+
+drop index REPOE2_FK;
+
+drop index REPOE_FK;
+
+drop table REPOE cascade constraints;
+
+drop table ROTA cascade constraints;
+
+drop table SEGUE cascade constraints;
+
+drop index TEM_FK;
+
+drop table VEICULOS cascade constraints;
+
+drop table VENDA cascade constraints;
+
+drop table VIAGEM cascade constraints;
+
+drop index VISITA2_FK;
+
+drop index VISITA_FK;
+
+drop table VISITA cascade constraints;
+
+/*==============================================================*/
+/* Table: APRESENTA                                             */
+/*==============================================================*/
+create table APRESENTA 
+(
+   ID_ESTADO            NUMBER(8)            not null,
+   ID_MAQUINA           NUMBER(8)            not null,
+   constraint PK_APRESENTA primary key (ID_ESTADO, ID_MAQUINA)
+);
+
+/*==============================================================*/
+/* Table: ARMAZEM                                               */
+/*==============================================================*/
+create table ARMAZEM 
+(
+   ID_ARMAZEM           NUMBER(8)            not null,
+   QTD_ULT_ENCOMENDA    NUMBER(8),
+   LOCAL                VARCHAR2(100),
+   CAPACIDADE           NUMBER(10),
+   constraint PK_ARMAZEM primary key (ID_ARMAZEM)
+);
+
+/*==============================================================*/
+/* Table: ARRANJA                                               */
+/*==============================================================*/
+create table ARRANJA 
+(
+   ID_FUNCIONARIO       NUMBER(8)            not null,
+   ID_MAQUINA           NUMBER(8)            not null,
+   constraint PK_ARRANJA primary key (ID_FUNCIONARIO, ID_MAQUINA)
+);
+
+/*==============================================================*/
+/* Index: ARRANJA_FK                                            */
+/*==============================================================*/
+create index ARRANJA_FK on ARRANJA (
+   ID_FUNCIONARIO ASC
+);
+
+/*==============================================================*/
+/* Index: ARRANJA2_FK                                           */
+/*==============================================================*/
+create index ARRANJA2_FK on ARRANJA (
+   ID_MAQUINA ASC
+);
+
+/*==============================================================*/
+/* Table: COBRE                                                 */
+/*==============================================================*/
+create table COBRE 
+(
+   ID_ROTA              NUMBER(8)            not null,
+   ID_MAQUINA           NUMBER(8)            not null,
+   constraint PK_COBRE primary key (ID_ROTA, ID_MAQUINA)
+);
+
+/*==============================================================*/
+/* Index: COBRE_FK                                              */
+/*==============================================================*/
+create index COBRE_FK on COBRE (
+   ID_ROTA ASC
+);
+
+/*==============================================================*/
+/* Index: COBRE2_FK                                             */
+/*==============================================================*/
+create index COBRE2_FK on COBRE (
+   ID_MAQUINA ASC
+);
+
+/*==============================================================*/
+/* Table: COMPARTIMENTO                                         */
+/*==============================================================*/
+create table COMPARTIMENTO 
+(
+   ID_COMPARTIMENTO     NUMBER(8)            not null,
+   ID_PRODUTO           NUMBER(8),
+   ID_MAQUINA           NUMBER(8)            not null,
+   PRECO_PROD           NUMBER(5),
+   QTD_PRODUTO          NUMBER(8),
+   constraint PK_COMPARTIMENTO primary key (ID_COMPARTIMENTO)
+);
+
+/*==============================================================*/
+/* Index: CONFIGURA_FK                                          */
+/*==============================================================*/
+create index CONFIGURA_FK on COMPARTIMENTO (
+   ID_MAQUINA ASC
+);
+
+/*==============================================================*/
+/* Index: CONTEM_FK                                             */
+/*==============================================================*/
+create index CONTEM_FK on COMPARTIMENTO (
+   ID_PRODUTO ASC
+);
+
+/*==============================================================*/
+/* Table: CONSTA                                                */
+/*==============================================================*/
+create table CONSTA 
+(
+   ID_VEICULOS          NUMBER(8)            not null,
+   ID_VIAGEM            NUMBER(8)            not null,
+   VEI_ID_VEICULOS      NUMBER(8)            not null,
+   constraint PK_CONSTA primary key (ID_VEICULOS, ID_VIAGEM, VEI_ID_VEICULOS)
+);
+
+/*==============================================================*/
+/* Table: CONSTITUI                                             */
+/*==============================================================*/
+create table CONSTITUI 
+(
+   ID_PRODUTO           NUMBER(8)            not null,
+   ID_ENCOMENDA         NUMBER(8)            not null,
+   DATA_ENCOMENDA       DATE,
+   QTD_ENCOMENDADAS     NUMBER(10),
+   constraint PK_CONSTITUI primary key (ID_PRODUTO, ID_ENCOMENDA)
+);
+
+/*==============================================================*/
+/* Index: CONSTITUI_FK                                          */
+/*==============================================================*/
+create index CONSTITUI_FK on CONSTITUI (
+   ID_PRODUTO ASC
+);
+
+/*==============================================================*/
+/* Index: CONSTITUI2_FK                                         */
+/*==============================================================*/
+create index CONSTITUI2_FK on CONSTITUI (
+   ID_ENCOMENDA ASC
+);
+
+/*==============================================================*/
+/* Table: ENCOMENDA                                             */
+/*==============================================================*/
+create table ENCOMENDA 
+(
+   ID_ENCOMENDA         NUMBER(8)            not null,
+   QTD_PREVISIVEIS      NUMBER(10),
+   constraint PK_ENCOMENDA primary key (ID_ENCOMENDA)
+);
+
+/*==============================================================*/
+/* Table: ESTADO                                                */
+/*==============================================================*/
+create table ESTADO 
+(
+   ID_ESTADO            NUMBER(8)            not null,
+   TIPO                 VARCHAR2(20),
+   DATA_ULT_ESTADO      DATE,
+   TEMPO_ESTADO_ATUAL   DATE,
+   constraint PK_ESTADO primary key (ID_ESTADO)
+);
+
+/*==============================================================*/
+/* Table: FAZ                                                   */
+/*==============================================================*/
+create table FAZ 
+(
+   ID_FUNCIONARIO       NUMBER(8)            not null,
+   ID_VEICULOS          NUMBER(8)            not null,
+   ID_VIAGEM            NUMBER(8)            not null,
+   constraint PK_FAZ primary key (ID_FUNCIONARIO, ID_VEICULOS, ID_VIAGEM)
+);
+
+/*==============================================================*/
+/* Index: FAZ_FK                                                */
+/*==============================================================*/
+create index FAZ_FK on FAZ (
+   ID_FUNCIONARIO ASC
+);
+
+/*==============================================================*/
+/* Index: FAZ2_FK                                               */
+/*==============================================================*/
+create index FAZ2_FK on FAZ (
+   ID_VEICULOS ASC,
+   ID_VIAGEM ASC
+);
+
+/*==============================================================*/
+/* Table: FUNCIONARIO                                           */
+/*==============================================================*/
+create table FUNCIONARIO 
+(
+   ID_FUNCIONARIO       NUMBER(8)            not null,
+   NOME                 NVARCHAR2(20),
+   CONTATO              NUMBER(12),
+   constraint PK_FUNCIONARIO primary key (ID_FUNCIONARIO)
+);
+
+/*==============================================================*/
+/* Table: GUARDA                                                */
+/*==============================================================*/
+create table GUARDA 
+(
+   ID_ARMAZEM           NUMBER(8)            not null,
+   ID_PRODUTO           NUMBER(8)            not null,
+   QTD_COLOCADAS        NUMBER(10),
+   QTD_VENDIDAS         NUMBER(10),
+   QTD_MININMA          NUMBER(10),
+   QTD_STOCK            NUMBER(10),
+   DATA_ULT_ENCOMENDA   DATE,
+   constraint PK_GUARDA primary key (ID_ARMAZEM, ID_PRODUTO)
+);
+
+/*==============================================================*/
+/* Index: GUARDA_FK                                             */
+/*==============================================================*/
+create index GUARDA_FK on GUARDA (
+   ID_ARMAZEM ASC
+);
+
+/*==============================================================*/
+/* Index: GUARDA2_FK                                            */
+/*==============================================================*/
+create index GUARDA2_FK on GUARDA (
+   ID_PRODUTO ASC
+);
+
+/*==============================================================*/
+/* Table: INCLUI                                                */
+/*==============================================================*/
+create table INCLUI 
+(
+   ID_MAQUINA           NUMBER(8)            not null,
+   ID_PRODUTO           NUMBER(8)            not null,
+   QTD_PRODUTOS         NUMBER(10),
+   CAP_MAXIMA           NUMBER(10),
+   constraint PK_INCLUI primary key (ID_MAQUINA, ID_PRODUTO)
+);
+
+/*==============================================================*/
+/* Index: INCLUI_FK                                             */
+/*==============================================================*/
+create index INCLUI_FK on INCLUI (
+   ID_MAQUINA ASC
+);
+
+/*==============================================================*/
+/* Index: INCLUI2_FK                                            */
+/*==============================================================*/
+create index INCLUI2_FK on INCLUI (
+   ID_PRODUTO ASC
+);
+
+/*==============================================================*/
+/* Table: INFLUENCIA                                            */
+/*==============================================================*/
+create table INFLUENCIA 
+(
+   ID_VENDA             NUMBER(8)            not null,
+   ID_ARMAZEM           NUMBER(8)            not null,
+   constraint PK_INFLUENCIA primary key (ID_VENDA, ID_ARMAZEM)
+);
+
+/*==============================================================*/
+/* Index: INFLUENCIA_FK                                         */
+/*==============================================================*/
+create index INFLUENCIA_FK on INFLUENCIA (
+   ID_VENDA ASC
+);
+
+/*==============================================================*/
+/* Index: INFLUENCIA2_FK                                        */
+/*==============================================================*/
+create index INFLUENCIA2_FK on INFLUENCIA (
+   ID_ARMAZEM ASC
+);
+
+/*==============================================================*/
+/* Table: MAQUINA                                               */
+/*==============================================================*/
+create table MAQUINA 
+(
+   ID_MAQUINA           NUMBER(8)            not null,
+   LOCAL                VARCHAR2(100),
+   DATA_ULT_VISITA      DATE,
+   constraint PK_MAQUINA primary key (ID_MAQUINA)
+);
+
+/*==============================================================*/
+/* Table: PEDE                                                  */
+/*==============================================================*/
+create table PEDE 
+(
+   ID_ENCOMENDA         NUMBER(8)            not null,
+   ID_ARMAZEM           NUMBER(8)            not null,
+   constraint PK_PEDE primary key (ID_ENCOMENDA, ID_ARMAZEM)
+);
+
+/*==============================================================*/
+/* Table: PRODUTO                                               */
+/*==============================================================*/
+create table PRODUTO 
+(
+   ID_PRODUTO           NUMBER(8)            not null,
+   ID_VENDA             NUMBER(8)            not null,
+   NOME                 NVARCHAR2(20),
+   constraint PK_PRODUTO primary key (ID_PRODUTO)
+);
+
+/*==============================================================*/
+/* Index: ASSOCIADO2_FK                                         */
+/*==============================================================*/
+create index ASSOCIADO2_FK on PRODUTO (
+   ID_VENDA ASC
+);
+
+/*==============================================================*/
+/* Table: REGISTA                                               */
+/*==============================================================*/
+create table REGISTA 
+(
+   ID_VENDA             NUMBER(8)            not null,
+   ID_MAQUINA           NUMBER(8)            not null,
+   constraint PK_REGISTA primary key (ID_VENDA, ID_MAQUINA)
+);
+
+/*==============================================================*/
+/* Table: REPOE                                                 */
+/*==============================================================*/
+create table REPOE 
+(
+   ID_VEICULOS          NUMBER(8)            not null,
+   ID_VIAGEM            NUMBER(8)            not null,
+   ID_PRODUTO           NUMBER(8)            not null,
+   constraint PK_REPOE primary key (ID_VEICULOS, ID_VIAGEM, ID_PRODUTO)
+);
+
+/*==============================================================*/
+/* Index: REPOE_FK                                              */
+/*==============================================================*/
+create index REPOE_FK on REPOE (
+   ID_VEICULOS ASC,
+   ID_VIAGEM ASC
+);
+
+/*==============================================================*/
+/* Index: REPOE2_FK                                             */
+/*==============================================================*/
+create index REPOE2_FK on REPOE (
+   ID_PRODUTO ASC
+);
+
+/*==============================================================*/
+/* Table: ROTA                                                  */
+/*==============================================================*/
+create table ROTA 
+(
+   ID_ROTA              NUMBER(8)            not null,
+   constraint PK_ROTA primary key (ID_ROTA)
+);
+
+/*==============================================================*/
+/* Table: SEGUE                                                 */
+/*==============================================================*/
+create table SEGUE 
+(
+   ID_ROTA              NUMBER(8)            not null,
+   ID_VEICULOS          NUMBER(8)            not null,
+   ID_VIAGEM            NUMBER(8)            not null,
+   constraint PK_SEGUE primary key (ID_ROTA, ID_VEICULOS, ID_VIAGEM)
+);
+
+/*==============================================================*/
+/* Table: VEICULOS                                              */
+/*==============================================================*/
+create table VEICULOS 
+(
+   ID_VEICULOS          NUMBER(8)            not null,
+   ID_ARMAZEM           NUMBER(8),
+   NUM_KM               NUMBER(10),
+   constraint PK_VEICULOS primary key (ID_VEICULOS)
+);
+
+/*==============================================================*/
+/* Index: TEM_FK                                                */
+/*==============================================================*/
+create index TEM_FK on VEICULOS (
+   ID_ARMAZEM ASC
+);
+
+/*==============================================================*/
+/* Table: VENDA                                                 */
+/*==============================================================*/
+create table VENDA 
+(
+   ID_VENDA             NUMBER(8)            not null,
+   ESTADO_VENDA         VARCHAR2(20),
+   QUANTIA              NUMBER(8),
+   PAGAMENTO            NUMBER(8),
+   DATA_VENDA           DATE,
+   constraint PK_VENDA primary key (ID_VENDA)
+);
+
+/*==============================================================*/
+/* Table: VIAGEM                                                */
+/*==============================================================*/
+create table VIAGEM 
+(
+   ID_VEICULOS          NUMBER(8)            not null,
+   ID_VIAGEM            NUMBER(8)            not null,
+   DATA_INICIO          DATE,
+   DATA_FIM             DATE,
+   DISTANCIA_KM         NUMBER(10),
+   ESTADO_VIAGEM        VARCHAR2(20),
+   constraint PK_VIAGEM primary key (ID_VEICULOS, ID_VIAGEM)
+);
+
+/*==============================================================*/
+/* Table: VISITA                                                */
+/*==============================================================*/
+create table VISITA 
+(
+   ID_MAQUINA           NUMBER(8)            not null,
+   ID_VEICULOS          NUMBER(8)            not null,
+   ID_VIAGEM            NUMBER(8)            not null,
+   ID_PRODUTO           NUMBER(8)            not null,
+   QTD_COLOCADAS        NUMBER(10),
+   constraint PK_VISITA primary key (ID_MAQUINA, ID_VEICULOS, ID_VIAGEM, ID_PRODUTO)
+);
+
+/*==============================================================*/
+/* Index: VISITA_FK                                             */
+/*==============================================================*/
+create index VISITA_FK on VISITA (
+   ID_MAQUINA ASC
+);
+
+/*==============================================================*/
+/* Index: VISITA2_FK                                            */
+/*==============================================================*/
+create index VISITA2_FK on VISITA (
+   ID_VEICULOS ASC,
+   ID_VIAGEM ASC
+);
+
+alter table APRESENTA
+   add constraint FK_APRESENT_REFERENCE_ESTADO foreign key (ID_ESTADO)
+      references ESTADO (ID_ESTADO);
+
+alter table APRESENTA
+   add constraint FK_APRESENT_REFERENCE_MAQUINA foreign key (ID_MAQUINA)
+      references MAQUINA (ID_MAQUINA);
+
+alter table ARRANJA
+   add constraint FK_ARRANJA_ARRANJA_FUNCIONA foreign key (ID_FUNCIONARIO)
+      references FUNCIONARIO (ID_FUNCIONARIO);
+
+alter table ARRANJA
+   add constraint FK_ARRANJA_ARRANJA2_MAQUINA foreign key (ID_MAQUINA)
+      references MAQUINA (ID_MAQUINA);
+
+alter table COBRE
+   add constraint FK_COBRE_COBRE_ROTA foreign key (ID_ROTA)
+      references ROTA (ID_ROTA);
+
+alter table COBRE
+   add constraint FK_COBRE_COBRE2_MAQUINA foreign key (ID_MAQUINA)
+      references MAQUINA (ID_MAQUINA);
+
+alter table COMPARTIMENTO
+   add constraint FK_COMPARTI_CONFIGURA_MAQUINA foreign key (ID_MAQUINA)
+      references MAQUINA (ID_MAQUINA);
+
+alter table COMPARTIMENTO
+   add constraint FK_COMPARTI_CONTEM_PRODUTO foreign key (ID_PRODUTO)
+      references PRODUTO (ID_PRODUTO);
+
+alter table CONSTA
+   add constraint FK_CONSTA_REFERENCE_VIAGEM foreign key (ID_VEICULOS, ID_VIAGEM)
+      references VIAGEM (ID_VEICULOS, ID_VIAGEM);
+
+alter table CONSTA
+   add constraint FK_CONSTA_REFERENCE_VEICULOS foreign key (VEI_ID_VEICULOS)
+      references VEICULOS (ID_VEICULOS);
+
+alter table CONSTITUI
+   add constraint FK_CONSTITU_CONSTITUI_PRODUTO foreign key (ID_PRODUTO)
+      references PRODUTO (ID_PRODUTO);
+
+alter table CONSTITUI
+   add constraint FK_CONSTITU_CONSTITUI_ENCOMEND foreign key (ID_ENCOMENDA)
+      references ENCOMENDA (ID_ENCOMENDA);
+
+alter table FAZ
+   add constraint FK_FAZ_FAZ_FUNCIONA foreign key (ID_FUNCIONARIO)
+      references FUNCIONARIO (ID_FUNCIONARIO);
+
+alter table FAZ
+   add constraint FK_FAZ_FAZ2_VIAGEM foreign key (ID_VEICULOS, ID_VIAGEM)
+      references VIAGEM (ID_VEICULOS, ID_VIAGEM);
+
+alter table GUARDA
+   add constraint FK_GUARDA_GUARDA_ARMAZEM foreign key (ID_ARMAZEM)
+      references ARMAZEM (ID_ARMAZEM);
+
+alter table GUARDA
+   add constraint FK_GUARDA_GUARDA2_PRODUTO foreign key (ID_PRODUTO)
+      references PRODUTO (ID_PRODUTO);
+
+alter table INCLUI
+   add constraint FK_INCLUI_INCLUI_MAQUINA foreign key (ID_MAQUINA)
+      references MAQUINA (ID_MAQUINA);
+
+alter table INCLUI
+   add constraint FK_INCLUI_INCLUI2_PRODUTO foreign key (ID_PRODUTO)
+      references PRODUTO (ID_PRODUTO);
+
+alter table INFLUENCIA
+   add constraint FK_INFLUENC_INFLUENCI_VENDA foreign key (ID_VENDA)
+      references VENDA (ID_VENDA);
+
+alter table INFLUENCIA
+   add constraint FK_INFLUENC_INFLUENCI_ARMAZEM foreign key (ID_ARMAZEM)
+      references ARMAZEM (ID_ARMAZEM);
+
+alter table PEDE
+   add constraint FK_PEDE_REFERENCE_ENCOMEND foreign key (ID_ENCOMENDA)
+      references ENCOMENDA (ID_ENCOMENDA);
+
+alter table PEDE
+   add constraint FK_PEDE_REFERENCE_ARMAZEM foreign key (ID_ARMAZEM)
+      references ARMAZEM (ID_ARMAZEM);
+
+alter table PRODUTO
+   add constraint FK_PRODUTO_ASSOCIADO_VENDA foreign key (ID_VENDA)
+      references VENDA (ID_VENDA);
+
+alter table REGISTA
+   add constraint FK_REGISTA_REFERENCE_VENDA foreign key (ID_VENDA)
+      references VENDA (ID_VENDA);
+
+alter table REGISTA
+   add constraint FK_REGISTA_REFERENCE_MAQUINA foreign key (ID_MAQUINA)
+      references MAQUINA (ID_MAQUINA);
+
+alter table REPOE
+   add constraint FK_REPOE_REPOE_VIAGEM foreign key (ID_VEICULOS, ID_VIAGEM)
+      references VIAGEM (ID_VEICULOS, ID_VIAGEM);
+
+alter table REPOE
+   add constraint FK_REPOE_REPOE2_PRODUTO foreign key (ID_PRODUTO)
+      references PRODUTO (ID_PRODUTO);
+
+alter table SEGUE
+   add constraint FK_SEGUE_REFERENCE_ROTA foreign key (ID_ROTA)
+      references ROTA (ID_ROTA);
+
+alter table SEGUE
+   add constraint FK_SEGUE_REFERENCE_VIAGEM foreign key (ID_VEICULOS, ID_VIAGEM)
+      references VIAGEM (ID_VEICULOS, ID_VIAGEM);
+
+alter table VEICULOS
+   add constraint FK_VEICULOS_TEM_ARMAZEM foreign key (ID_ARMAZEM)
+      references ARMAZEM (ID_ARMAZEM);
+
+alter table VISITA
+   add constraint FK_VISITA_REFERENCE_PRODUTO foreign key (ID_PRODUTO)
+      references PRODUTO (ID_PRODUTO);
+
+alter table VISITA
+   add constraint FK_VISITA_VISITA_MAQUINA foreign key (ID_MAQUINA)
+      references MAQUINA (ID_MAQUINA);
+
+alter table VISITA
+   add constraint FK_VISITA_VISITA2_VIAGEM foreign key (ID_VEICULOS, ID_VIAGEM)
+      references VIAGEM (ID_VEICULOS, ID_VIAGEM);
+
