@@ -1,0 +1,42 @@
+CREATE OR REPLACE VIEW VIEW_G AS
+WITH Trips_Gt3_Machines AS (
+    -- Identifica viagens em 2024 com mais de 3 máquinas distintas visitadas
+    SELECT par.ID_VIAGEM
+    FROM Paragem par
+    JOIN Viagem v ON par.ID_VIAGEM = v.ID_VIAGEM
+    WHERE EXTRACT(YEAR FROM v.DATA_HORA_INICIO) = EXTRACT(YEAR FROM SYSDATE) - 1 
+    GROUP BY par.ID_VIAGEM
+    HAVING COUNT(DISTINCT par.ID_MAQUINA) > 3
+),
+AbastecimentosCoimbra2024 AS (
+    -- Detalhes dos abastecimentos feitos em Coimbra nessas viagens válidas
+    SELECT
+        ad.ID_PRODUTO,
+        ad.QUANTIDADE_ABASTECIDA,
+        par.ID_MAQUINA,
+        par.ID_VIAGEM 
+    FROM Abastecimento_Detalhe ad
+    JOIN Paragem par ON ad.ID_PARAGEM = par.ID_PARAGEM
+    JOIN Maquina m ON par.ID_MAQUINA = m.ID_MAQUINA
+    WHERE par.ID_VIAGEM IN (SELECT ID_VIAGEM FROM Trips_Gt3_Machines)
+      AND m.CIDADE = 'Coimbra'
+)
+
+SELECT NUM_VIAGENS_ENVOLVIDAS, TIPO_PRODUTO, QUANT_ABASTECIDA, NUM_MAQ_ABASTECIDAS
+FROM (
+   
+    SELECT
+        p.TIPO as TIPO_PRODUTO,
+        SUM(a.QUANTIDADE_ABASTECIDA) as QUANT_ABASTECIDA,          
+        COUNT(DISTINCT a.ID_MAQUINA) as NUM_MAQ_ABASTECIDAS, 
+        COUNT(DISTINCT a.ID_VIAGEM) as NUM_VIAGENS_ENVOLVIDAS 
+    FROM AbastecimentosCoimbra2024 a
+    JOIN Produto p ON a.ID_PRODUTO = p.ID_PRODUTO
+    GROUP BY p.TIPO 
+    ORDER BY QUANT_ABASTECIDA DESC 
+)
+WHERE ROWNUM <= 2;
+
+
+
+SELECT * FROM VIEW_G;

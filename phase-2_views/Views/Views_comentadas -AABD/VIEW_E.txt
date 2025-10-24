@@ -1,0 +1,72 @@
+CREATE OR REPLACE VIEW VIEW_E AS
+WITH MachineRestockCounts AS (
+    --Conta paragens distintas COM abastecimento por máquina (vida útil)
+    SELECT
+        pg.ID_MAQUINA,
+        COUNT(DISTINCT pg.ID_PARAGEM) AS RestockCount
+    FROM Paragem pg
+    WHERE EXISTS (SELECT 1 FROM Abastecimento_Detalhe ad WHERE ad.ID_PARAGEM = pg.ID_PARAGEM)
+    GROUP BY pg.ID_MAQUINA
+),
+AvgRestocks AS (
+    -- Calcula a média geral de abastecimentos por máquina
+    SELECT AVG(NVL(mrc.RestockCount, 0)) AS AvgRestockCount 
+    FROM Maquina m
+    LEFT JOIN MachineRestockCounts mrc ON m.ID_MAQUINA = mrc.ID_MAQUINA 
+),
+QualifyingMachines AS (
+    --Seleciona máquinas ATUALMENTE operacionais E com abastecimentos acima da média
+    SELECT
+        m.ID_MAQUINA
+    FROM Maquina m
+    JOIN Estado_Maquina em ON m.ID_ESTADO_ATUAL = em.ID_ESTADO
+    LEFT JOIN MachineRestockCounts mrc ON m.ID_MAQUINA = mrc.ID_MAQUINA
+    CROSS JOIN AvgRestocks ar -- Junta a média global
+    WHERE em.DESCRICAO = 'Operacional'                  
+      AND NVL(mrc.RestockCount, 0) > ar.AvgRestockCount 
+),
+MonthlySales AS (
+    -- Calcula SUM(Quantidade) por Produto, Ano, Mês para máquinas qualificadas em 2023-2024
+    SELECT
+        v.ID_PRODUTO,
+        EXTRACT(YEAR FROM v.DATA_VENDA) AS SaleYear,
+        EXTRACT(MONTH FROM v.DATA_VENDA) AS SaleMonth,
+        SUM(v.QUANTIDADE) AS MonthlyQuantity
+    FROM Venda v
+    WHERE v.ID_MAQUINA IN (SELECT ID_MAQUINA FROM QualifyingMachines) 
+      AND EXTRACT(YEAR FROM v.DATA_VENDA) IN (2023, 2024)            
+    GROUP BY
+        v.ID_PRODUTO,
+        EXTRACT(YEAR FROM v.DATA_VENDA),
+        EXTRACT(MONTH FROM v.DATA_VENDA)
+),
+AvgMonthlySalesPerProduct AS (
+    --Calcula a média das vendas mensais para cada produto
+    SELECT
+        ms.ID_PRODUTO,
+        AVG(ms.MonthlyQuantity) AS AvgMonthlyQuantity
+    FROM MonthlySales ms
+    GROUP BY ms.ID_PRODUTO
+)
+
+SELECT
+    
+    p.NOME AS PRODUTO,
+    ROUND(amsp.AvgMonthlyQuantity) AS MEDIAMENSAL 
+FROM AvgMonthlySalesPerProduct amsp
+JOIN Produto p ON amsp.ID_PRODUTO = p.ID_PRODUTO
+ORDER BY
+    MEDIAMENSAL DESC,
+    PRODUTO ASC;     
+
+-- Comentários 
+COMMENT ON TABLE VIEW_E IS 'Média mensal de vendas por produto (anos 2023-2024) considerando apenas máquinas operacionais com nº de abastecimentos acima da média.';
+
+
+
+SELECT * FROM VIEW_E;
+
+
+
+
+
