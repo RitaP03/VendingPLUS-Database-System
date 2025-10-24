@@ -1,0 +1,1104 @@
+-- =======================================================================================
+-- ======================================= Alínea I) =====================================
+-- =======================================================================================
+-- ============================================
+-- Procedimento: CRIA_VIAGEM_ABAST
+-- Objetivo: Criar uma viagem de abastecimento a partir de um armazém,
+--           selecionando até 10 máquinas num raio definido, ordenadas
+--           por maior rutura de stock (percentagem mais baixa).
+-- Parâmetros:
+--   - cod_armazem: código do armazém de origem
+--   - raio: distância máxima (em km) para considerar máquinas elegíveis
+-- Efeitos esperados:
+--   - Insere uma nova viagem com estado 'Planeada'
+--   - Insere paragens para as máquinas com maior rutura
+-- Exceções relevantes:
+--   - -20806: armazém não encontrado
+--   - -20811: nenhuma máquina qualificada no raio indicado
+--   - -20814: raio inválido (zero ou negativo)
+--   - -20815: falha na criação da viagem
+--   - -20816: máquina inválida encontrada durante a seleção
+-- ============================================
+
+
+
+-- =============================================================
+-- Criação da sequência para ID_VIAGEM
+-- =============================================================
+-- CREATE SEQUENCE seq_viagem
+--    START WITH 1
+--    INCREMENT BY 1
+--    NOCACHE
+--    NOCYCLE;
+-- Justificação: utilizada para gerar IDs únicos para cada viagem.
+
+
+
+
+CREATE OR REPLACE PROCEDURE cria_viagem_abast (
+    cod_armazem IN NUMBER,
+    raio        IN NUMBER
+)
+IS
+    v_lat        Armazem.LATITUDE%TYPE;
+    v_long       Armazem.LONGITUDE%TYPE;
+    v_viagem_id  Viagem.ID_VIAGEM%TYPE;
+    v_ordem      NUMBER := 1;
+
+    pi          CONSTANT NUMBER := 3.141592653589793;
+    raio_terra  CONSTANT NUMBER := 6371; -- Raio médio da Terra (km)
+
+    -- Cursor para verificar se há máquinas no raio com configurações ativas
+    CURSOR maquinas_existem IS
+        SELECT 1
+        FROM Maquina m
+        JOIN Compartimento c ON m.ID_MAQUINA = c.ID_MAQUINA
+        JOIN Configuracao_Compartimento conf ON c.ID_COMPARTIMENTO = conf.ID_COMPARTIMENTO
+        WHERE conf.DATA_FIM_CONFIGURACAO IS NULL
+        GROUP BY m.ID_MAQUINA, m.LATITUDE, m.LONGITUDE
+        HAVING raio_terra * 2 * ATAN2(
+            SQRT(
+                SIN(((v_lat - m.LATITUDE) * pi / 180)/2) * SIN(((v_lat - m.LATITUDE) * pi / 180)/2) +
+                COS(m.LATITUDE * pi / 180) * COS(v_lat * pi / 180) *
+                SIN(((v_long - m.LONGITUDE) * pi / 180)/2) * SIN(((v_long - m.LONGITUDE) * pi / 180)/2)
+            ),
+            SQRT(
+                1 - (
+                    SIN(((v_lat - m.LATITUDE) * pi / 180)/2) * SIN(((v_lat - m.LATITUDE) * pi / 180)/2) +
+                    COS(m.LATITUDE * pi / 180) * COS(v_lat * pi / 180) *
+                    SIN(((v_long - m.LONGITUDE) * pi / 180)/2) * SIN(((v_long - m.LONGITUDE) * pi / 180)/2)
+                )
+            )
+        ) <= raio;
+
+BEGIN
+    -- Verificação de validade do raio
+    IF raio <= 0 THEN
+        RAISE_APPLICATION_ERROR(-20814, 'Raio inválido. Deve ser um valor positivo.');
+    END IF;
+
+    -- Obter coordenadas do armazém de origem
+    SELECT LATITUDE, LONGITUDE
+    INTO v_lat, v_long
+    FROM Armazem
+    WHERE ID_ARMAZEM = cod_armazem;
+
+    -- Verificar se existem máquinas dentro do raio
+    OPEN maquinas_existem;
+    FETCH maquinas_existem INTO v_viagem_id;
+    IF maquinas_existem%NOTFOUND THEN
+        CLOSE maquinas_existem;
+        RAISE_APPLICATION_ERROR(-20811, 'Nenhuma máquina qualificada no raio.');
+    END IF;
+    CLOSE maquinas_existem;
+
+    -- Criar nova viagem planeada
+    INSERT INTO Viagem (
+        ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO,
+        ID_ARMAZEM_ORIGEM, ID_ARMAZEM_FIM,
+        DATA_HORA_INICIO, ESTADO_VIAGEM
+    ) VALUES (
+        seq_viagem.NEXTVAL, NULL, NULL,
+        cod_armazem, cod_armazem,
+        SYSTIMESTAMP, 'Planeada'
+    ) RETURNING ID_VIAGEM INTO v_viagem_id;
+
+    IF v_viagem_id IS NULL THEN
+        RAISE_APPLICATION_ERROR(-20815, 'Erro ao criar a viagem. ID não gerado.');
+    END IF;
+
+    -- Selecionar até 10 máquinas com menor percentagem de stock (maior rutura)
+    FOR r IN (
+        SELECT *
+        FROM (
+            SELECT m.ID_MAQUINA,
+                   SUM(conf.STOCK_ATUAL) / NULLIF(SUM(conf.CAPACIDADE_PRODUTO), 0) AS percentagem
+            FROM Maquina m
+            JOIN Compartimento c ON m.ID_MAQUINA = c.ID_MAQUINA
+            JOIN Configuracao_Compartimento conf ON c.ID_COMPARTIMENTO = conf.ID_COMPARTIMENTO
+            WHERE conf.DATA_FIM_CONFIGURACAO IS NULL
+            GROUP BY m.ID_MAQUINA, m.LATITUDE, m.LONGITUDE
+            HAVING raio_terra * 2 * ATAN2(
+                SQRT(
+                    SIN(((v_lat - m.LATITUDE) * pi / 180)/2) * SIN(((v_lat - m.LATITUDE) * pi / 180)/2) +
+                    COS(m.LATITUDE * pi / 180) * COS(v_lat * pi / 180) *
+                    SIN(((v_long - m.LONGITUDE) * pi / 180)/2) * SIN(((v_long - m.LONGITUDE) * pi / 180)/2)
+                ),
+                SQRT(
+                    1 - (
+                        SIN(((v_lat - m.LATITUDE) * pi / 180)/2) * SIN(((v_lat - m.LATITUDE) * pi / 180)/2) +
+                        COS(m.LATITUDE * pi / 180) * COS(v_lat * pi / 180) *
+                        SIN(((v_long - m.LONGITUDE) * pi / 180)/2) * SIN(((v_long - m.LONGITUDE) * pi / 180)/2)
+                    )
+                )
+            ) <= raio
+            ORDER BY percentagem
+        )
+        WHERE ROWNUM <= 10
+    ) LOOP
+        IF r.ID_MAQUINA IS NULL THEN
+            RAISE_APPLICATION_ERROR(-20816, 'Máquina com ID inválido encontrada durante planeamento.');
+        END IF;
+
+        -- Inserir a paragem correspondente
+        INSERT INTO Paragem (
+            ID_PARAGEM, ID_VIAGEM, ID_MAQUINA,
+            ORDEM_VISITA, TIPO_VISITA
+        ) VALUES (
+            seq_paragem.NEXTVAL, v_viagem_id, r.ID_MAQUINA,
+            v_ordem, 'Abastecimento'
+        );
+        v_ordem := v_ordem + 1;
+    END LOOP;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20806, 'Armazém não encontrado.');
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20811, 'Erro ao criar viagem: ' || SQLERRM);
+END;
+/
+
+
+
+
+
+/*******************************************************************************
+******************************* TESTES *****************************************
+*******************************************************************************/
+
+-- TESTE 1:
+-- Cria uma viagem de abastecimento a partir do armazém 1 (Taveiro),
+-- dentro de um raio de 5 km. Deve gerar até 10 paragens com maior rutura.
+BEGIN
+    cria_viagem_abast(1, 5);
+END;
+/
+
+-- Confirmar e guardar as alterações
+COMMIT;
+
+-- Verificar as paragens criadas na viagem
+SELECT *
+FROM Paragem
+WHERE ID_VIAGEM = (
+    SELECT MAX(ID_VIAGEM)
+    FROM Viagem
+    WHERE ID_ARMAZEM_ORIGEM = 1
+);
+
+
+-- TESTE 2:
+-- Usa um ID de armazém inexistente. Deve gerar erro -20806.
+BEGIN
+    cria_viagem_abast(999, 5);
+END;
+/
+
+
+-- TESTE 3:
+-- Usa um raio muito pequeno (0.01 km). Nenhuma máquina deverá ser selecionada.
+-- Deve gerar erro -20811.
+BEGIN
+    cria_viagem_abast(1, 0.01);
+END;
+/
+
+
+-- TESTE 4:
+-- Usa raio exagerado (999 km) para garantir que todas as máquinas são consideradas.
+-- Verifica que são inseridas no máximo 10 paragens.
+BEGIN
+    cria_viagem_abast(1, 999);
+END;
+/
+
+SELECT COUNT(*) AS total_paragens
+FROM Paragem
+WHERE ID_VIAGEM = (
+    SELECT MAX(ID_VIAGEM)
+    FROM Viagem
+    WHERE ID_ARMAZEM_ORIGEM = 1
+);
+
+
+-- TESTE 5:
+-- Raio inválido (0). Deve lançar erro -20814.
+BEGIN
+    cria_viagem_abast(1, 0);
+END;
+/
+
+
+-- TESTE 6:
+-- Raio negativo. Deve lançar erro -20814.
+BEGIN
+    cria_viagem_abast(1, -10);
+END;
+/
+
+
+
+
+
+
+
+
+-- =======================================================================================
+-- ======================================= Alínea J) =====================================
+-- =======================================================================================
+--Crie o procedimento encomenda_produtos que 
+--recebe o código de um armazém 
+--e uma data, e 
+
+--tomando em consideração a quantidade vendida desde essa data, 
+--a quantidade existente nas máquinas e a quantidade em stock no armazém, 
+--encomende a quantidade de produtos necessários para a próxima semana. 
+
+--O procedimento deve retornar as seguintes exceções: -20806, -20812
+
+
+CREATE OR REPLACE PROCEDURE encomenda_produtos(
+    cod_armazem  IN NUMBER,
+    data_inicio   IN DATE
+)
+IS
+    armazem_existe NUMBER;
+    stock_maquinas     NUMBER;
+    stock_armazem      NUMBER;
+    quantidade_encomenda      NUMBER;
+    produto_encomendado BOOLEAN := FALSE;
+BEGIN
+    -- Validar data
+    IF data_inicio >= TRUNC(SYSDATE) THEN
+        RAISE_APPLICATION_ERROR(-20812, 'Data inválida. Deve ser anterior à data atual.');
+    END IF;
+
+    -- Validar armazém
+    SELECT COUNT(*) INTO armazem_existe
+    FROM armazem
+    WHERE id_armazem = cod_armazem;
+
+    IF armazem_existe = 0 THEN
+        RAISE_APPLICATION_ERROR(-20806, 'Armazém não existe');
+    END IF;
+
+    -- Loop direto sobre os produtos vendidos
+    FOR reg IN (
+        SELECT v.id_produto, SUM(v.quantidade) AS total_vendido
+        FROM venda v
+        WHERE v.data_venda >= data_inicio
+        GROUP BY v.id_produto
+    )
+    LOOP
+        -- Stock em todas as máquinas
+        SELECT SUM(c.stock_atual)
+        INTO stock_maquinas 
+        FROM configuracao_compartimento c
+        WHERE c.id_produto = reg.id_produto;
+
+        -- Stock no armazém
+        SELECT SUM(sa.stock_atual)
+        INTO stock_armazem
+        FROM stock_armazem sa
+        WHERE sa.id_armazem = cod_armazem
+          AND sa.id_produto = reg.id_produto;
+
+        -- Calcular necessidade
+        quantidade_encomenda := reg.total_vendido - stock_maquinas - stock_armazem;
+
+        IF quantidade_encomenda > 0 THEN
+            produto_encomendado := TRUE;
+            DBMS_OUTPUT.PUT_LINE(
+                'Encomendar ' || quantidade_encomenda || ' unidades do produto ' || reg.id_produto
+            );
+        END IF;
+    END LOOP;
+
+    IF NOT produto_encomendado THEN
+        RAISE_APPLICATION_ERROR(-20222, 'Nenhum produto necessita de encomenda.');
+    END IF;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20123, 'Erro: ' || SQLERRM);
+END;
+/
+
+
+-- Testes --
+--mostrar quais produtos foram vendidos desde 1 de abril de 2025.
+--erificar produtos vendidos após uma certa data
+SELECT id_produto, SUM(quantidade) AS total_vendido
+FROM venda
+WHERE data_venda >= TO_DATE('2025-04-01', 'YYYY-MM-DD')
+GROUP BY id_produto;
+
+--verificar stock total em máquinas por produto
+SELECT id_produto, SUM(stock_atual) AS total_maquinas
+FROM configuracao_compartimento
+GROUP BY id_produto;
+
+--verificar stock atual no armazém 1 por produto
+SELECT id_produto, stock_atual
+FROM stock_armazem
+WHERE id_armazem = 1;
+
+--verfcar a data
+BEGIN
+  encomenda_produtos(1, SYSDATE);  -- Data de hoje
+END;
+/
+
+--armazem n existe
+BEGIN
+  encomenda_produtos(9999, TO_DATE('2025-04-01', 'YYYY-MM-DD'));  
+END;
+/
+
+--nenhum produto necessita de encomenda
+BEGIN
+  -- Data recente, presumivelmente sem vendas que justifiquem encomenda
+  encomenda_produtos(1, SYSDATE - 1);  
+
+END;
+/
+
+
+
+
+
+
+
+
+
+-- =======================================================================================
+-- ======================================= Alínea K) =====================================
+-- =======================================================================================
+-- ============================================
+-- Procedimento: ABASTECE_PRODUTO
+-- Objetivo: Criar uma viagem de abastecimento a partir de um armazém,
+--           distribuindo uma quantidade de produto por máquinas com rutura,
+--           priorizando as que têm maior necessidade.
+--
+-- Parâmetros:
+--   - cod_armazem: ID do armazém de origem
+--   - cod_produto: ID do produto a abastecer
+--   - quantidade : quantidade total a distribuir
+--
+-- Validações:
+--   - Armazém e produto devem existir
+--   - Quantidade deve ser superior a 0
+--   - Armazém deve ter stock suficiente do produto
+--   - Deve existir pelo menos uma máquina com rutura ativa do produto
+--
+-- Ações realizadas:
+--   - Criação de uma viagem com estado 'Planeada'
+--   - Criação de paragens para máquinas em rutura
+--   - Registo detalhado do abastecimento por compartimento
+--
+-- Exceções:
+--   - -20802: Produto não existe
+--   - -20804: Nenhuma máquina com rutura
+--   - -20805: Stock insuficiente no armazém
+--   - -20806: Armazém não existe
+--   - -20813: Quantidade inválida
+-- ============================================
+
+CREATE OR REPLACE PROCEDURE abastece_produto (
+    cod_armazem IN NUMBER,
+    cod_produto IN NUMBER,
+    quantidade  IN NUMBER
+)
+IS
+    v_viagem_id    Viagem.ID_VIAGEM%TYPE;
+    v_ordem        NUMBER := 1;
+    v_qtd_restante NUMBER := quantidade;
+    v_id_paragem   Paragem.ID_PARAGEM%TYPE;
+    v_dummy        NUMBER;
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Início do procedimento.');
+
+    -- Valida existência do armazém
+    BEGIN
+        SELECT 1 INTO v_dummy FROM Armazem WHERE ID_ARMAZEM = cod_armazem;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20806, 'Armazém não encontrado.');
+    END;
+
+    -- Valida existência do produto
+    BEGIN
+        SELECT 1 INTO v_dummy FROM Produto WHERE ID_PRODUTO = cod_produto;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20802, 'Produto não encontrado.');
+    END;
+
+    -- Valida quantidade fornecida
+    IF quantidade <= 0 THEN
+        RAISE_APPLICATION_ERROR(-20813, 'Quantidade inválida.');
+    END IF;
+
+    -- Verifica stock disponível no armazém
+    DECLARE
+        v_stock_disponivel NUMBER;
+    BEGIN
+        SELECT STOCK_ATUAL INTO v_stock_disponivel
+        FROM Stock_Armazem
+        WHERE ID_ARMAZEM = cod_armazem 
+        AND ID_PRODUTO = cod_produto;
+
+        IF v_stock_disponivel < quantidade THEN
+            RAISE_APPLICATION_ERROR(-20805, 'Stock insuficiente no armazém.');
+        END IF;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20814, 'Produto não se encontra registado no stock do armazém.');
+    END;
+
+
+    -- Verifica se existem máquinas com rutura ativa para o produto
+    DECLARE
+        v_existem_maquinas NUMBER;
+    BEGIN
+        SELECT COUNT(*) INTO v_existem_maquinas
+        FROM Configuracao_Compartimento conf
+        WHERE conf.ID_PRODUTO = cod_produto
+          AND conf.STOCK_ATUAL < conf.CAPACIDADE_PRODUTO
+          AND conf.DATA_FIM_CONFIGURACAO IS NULL;
+
+        IF v_existem_maquinas = 0 THEN
+            RAISE_APPLICATION_ERROR(-20804, 'Nenhuma máquina com rutura para este produto.');
+        END IF;
+    END;
+
+    -- Criação da viagem de abastecimento
+    INSERT INTO Viagem (
+        ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO,
+        ID_ARMAZEM_ORIGEM, ID_ARMAZEM_FIM,
+        DATA_HORA_INICIO, ESTADO_VIAGEM
+    ) VALUES (
+        seq_viagem.NEXTVAL, NULL, NULL,
+        cod_armazem, cod_armazem,
+        SYSTIMESTAMP, 'Planeada'
+    ) RETURNING ID_VIAGEM INTO v_viagem_id;
+
+    -- Percorre máquinas com maior rutura, enquanto houver produto a distribuir
+    FOR r IN (
+        SELECT m.ID_MAQUINA, conf.ID_COMPARTIMENTO,
+               conf.STOCK_ATUAL, conf.CAPACIDADE_PRODUTO,
+               (conf.CAPACIDADE_PRODUTO - conf.STOCK_ATUAL) AS rutura
+        FROM Maquina m
+        JOIN Compartimento c ON m.ID_MAQUINA = c.ID_MAQUINA
+        JOIN Configuracao_Compartimento conf ON c.ID_COMPARTIMENTO = conf.ID_COMPARTIMENTO
+        WHERE conf.ID_PRODUTO = cod_produto
+          AND conf.STOCK_ATUAL < conf.CAPACIDADE_PRODUTO
+          AND conf.DATA_FIM_CONFIGURACAO IS NULL
+        ORDER BY rutura DESC
+    ) LOOP
+        EXIT WHEN v_qtd_restante <= 0;
+
+        DECLARE
+            v_a NUMBER := LEAST(r.rutura, v_qtd_restante);
+        BEGIN
+            -- Criação da paragem
+            INSERT INTO Paragem (
+                ID_PARAGEM, ID_VIAGEM, ID_MAQUINA,
+                ORDEM_VISITA, TIPO_VISITA
+            ) VALUES (
+                seq_paragem.NEXTVAL, v_viagem_id, r.ID_MAQUINA,
+                v_ordem, 'Abastecimento'
+            ) RETURNING ID_PARAGEM INTO v_id_paragem;
+
+            -- Registo do detalhe do abastecimento
+            INSERT INTO Abastecimento_Detalhe (
+                ID_ABASTECIMENTO, ID_PARAGEM, ID_PRODUTO,
+                ID_COMPARTIMENTO, QUANTIDADE_ABASTECIDA,
+                STOCK_ANTES_ABAST, STOCK_DEPOIS_ABAST
+            ) VALUES (
+                seq_abastecimento.NEXTVAL, v_id_paragem, cod_produto,
+                r.ID_COMPARTIMENTO, v_a,
+                r.STOCK_ATUAL, r.STOCK_ATUAL + v_a
+            );
+
+            -- Atualização do stock do compartimento
+            UPDATE Configuracao_Compartimento
+            SET STOCK_ATUAL = STOCK_ATUAL + v_a
+            WHERE ID_COMPARTIMENTO = r.ID_COMPARTIMENTO;
+
+            v_qtd_restante := v_qtd_restante - v_a;
+            v_ordem := v_ordem + 1;
+            DBMS_OUTPUT.PUT_LINE('Abastecido: ' || v_a || ' na máquina ' || r.ID_MAQUINA);
+        END;
+    END LOOP;
+
+    DBMS_OUTPUT.PUT_LINE('Fim do procedimento.');
+
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Erro: ' || SQLERRM);
+        RAISE;
+END;
+/
+
+
+
+
+/*******************************************************************************
+******************************* TESTES *****************************************
+*******************************************************************************/
+
+-- Ativar a saída do DBMS_OUTPUT
+SET SERVEROUTPUT ON;
+
+-- TESTE 1 – Execução funcional
+-- Espera-se execução com sucesso
+BEGIN
+    abastece_produto(1, 9901, 10);
+END;
+/
+
+
+
+-- TESTE 2 – Armazém inválido
+-- Espera-se erro: ORA-20806
+BEGIN
+    abastece_produto(999, 9901, 30);
+END;
+/
+
+
+
+-- TESTE 3 – Quantidade inválida
+-- Espera-se erro: ORA-20813
+BEGIN
+    abastece_produto(1, 9901, 0);
+END;
+/
+
+
+
+-- TESTE 4 – Produto sem máquinas com rutura
+-- Espera-se erro: ORA-20804
+DECLARE
+    v_stock_atual NUMBER;
+BEGIN
+    SELECT STOCK_ATUAL INTO v_stock_atual
+    FROM Configuracao_Compartimento
+    WHERE ID_PRODUTO = 9902 AND DATA_FIM_CONFIGURACAO IS NULL;
+
+    UPDATE Configuracao_Compartimento
+    SET STOCK_ATUAL = CAPACIDADE_PRODUTO
+    WHERE ID_PRODUTO = 9902 AND DATA_FIM_CONFIGURACAO IS NULL;
+    COMMIT;
+
+    BEGIN
+        abastece_produto(1, 9902, 10);
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Erro esperado: ' || SQLERRM);
+    END;
+
+    UPDATE Configuracao_Compartimento
+    SET STOCK_ATUAL = v_stock_atual
+    WHERE ID_PRODUTO = 9902 AND DATA_FIM_CONFIGURACAO IS NULL;
+    COMMIT;
+END;
+/
+
+
+
+-- TESTE 5 – Stock insuficiente no armazém
+-- Espera-se erro: ORA-20805
+BEGIN
+    abastece_produto(1, 9901, 9999);
+END;
+/
+
+
+
+-- TESTE 6 – Produto não registado no stock do armazém
+-- Espera-se erro: ORA-20814
+BEGIN
+    -- Supondo que o produto 9999 não está registado no stock do armazém 1
+    abastece_produto(1, 9999, 10);
+END;
+/
+
+
+
+
+
+
+
+
+
+
+
+-- =======================================================================================
+-- ============================ Procedimento Ana Pessoa ==================================
+-- =============================== Q_PROC_2023112690 =====================================
+-- =======================================================================================
+-- ============================================
+-- PROCEDIMENTO: Q_PROC_2023112690
+--
+-- DESCRIÇÃO:
+-- Este procedimento planeia uma viagem de abastecimento com base na rutura
+-- de stock de um produto específico num raio definido em torno de um armazém.
+-- Considera apenas as máquinas ativas e distribui a quantidade disponível
+-- proporcionalmente, começando pelas máquinas com menor stock atual.
+--
+-- Permite otimizar a logística de reposição de produtos, garantindo que os
+-- recursos são alocados de forma eficiente e que as máquinas com maior
+-- necessidade são abastecidas em primeiro lugar.
+--
+-- EXCEÇÕES POTENCIAIS:
+-- -20802: Código de produto inexistente
+-- -20806: Código de armazém inexistente
+-- -20813: Quantidade inválida
+--
+-- ============================================
+
+CREATE OR REPLACE PROCEDURE Q_PROC_2023112690 (
+    p_cod_armazem    IN NUMBER,
+    p_cod_produto    IN NUMBER,
+    p_qtd_disponivel IN NUMBER,
+    p_raio_km        IN NUMBER
+) IS
+    -- Cursor que seleciona máquinas ativas com necessidade do produto no raio indicado
+    CURSOR maquinas_com_needs IS
+        SELECT 
+            m.ID_MAQUINA,
+            c.ID_COMPARTIMENTO,
+            cc.STOCK_ATUAL,
+            cc.CAPACIDADE_PRODUTO,
+            m.LATITUDE,
+            m.LONGITUDE
+        FROM Maquina m
+        JOIN Compartimento c ON m.ID_MAQUINA = c.ID_MAQUINA
+        JOIN Configuracao_Compartimento cc ON cc.ID_COMPARTIMENTO = c.ID_COMPARTIMENTO
+        WHERE cc.ID_PRODUTO = p_cod_produto
+          AND cc.DATA_FIM_CONFIGURACAO IS NULL
+          AND m.ID_ESTADO_ATUAL <> 0
+          AND EXISTS (
+              SELECT 1 FROM Armazem a
+              WHERE a.ID_ARMAZEM = p_cod_armazem
+                AND distancia_linear(m.LATITUDE, m.LONGITUDE, a.LATITUDE, a.LONGITUDE) <= p_raio_km
+          )
+        ORDER BY cc.STOCK_ATUAL ASC;
+
+    v_viagem_id Viagem.ID_VIAGEM%TYPE;
+    v_paragem_id Paragem.ID_PARAGEM%TYPE;
+    v_abast_id Abastecimento_Detalhe.ID_ABASTECIMENTO%TYPE;
+    v_stock_fornecer NUMBER;
+    v_ordem NUMBER := 1;
+    v_qtd_disponivel NUMBER := p_qtd_disponivel;
+    v_dummy NUMBER;
+BEGIN
+    -- Verifica se a quantidade é válida
+    IF p_qtd_disponivel <= 0 THEN
+        RAISE_APPLICATION_ERROR(-20813, 'Quantidade inválida');
+    END IF;
+
+    -- Verifica se o produto existe
+    BEGIN
+        SELECT 1 INTO v_dummy
+        FROM Produto
+        WHERE ID_PRODUTO = p_cod_produto;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20802, 'Produto inexistente');
+    END;
+
+    -- Verifica se o armazém existe
+    BEGIN
+        SELECT 1 INTO v_dummy
+        FROM Armazem
+        WHERE ID_ARMAZEM = p_cod_armazem;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20806, 'Armazém inexistente');
+    END;
+
+    -- Criação da viagem de abastecimento
+    INSERT INTO Viagem (
+        ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, 
+        DATA_HORA_INICIO, DATA_HORA_FIM, ESTADO_VIAGEM
+    )
+    VALUES (
+        seq_viagem.NEXTVAL, 101, 'AA-11-BB', p_cod_armazem,
+        SYSTIMESTAMP,
+        SYSTIMESTAMP + NUMTODSINTERVAL(2, 'HOUR'),
+        'Planeada'
+    )
+    RETURNING ID_VIAGEM INTO v_viagem_id;
+
+    -- Distribuição da quantidade disponível pelas máquinas com menor stock
+    FOR rec IN maquinas_com_needs LOOP
+        EXIT WHEN v_qtd_disponivel <= 0;
+
+        v_stock_fornecer := LEAST(v_qtd_disponivel, rec.CAPACIDADE_PRODUTO - rec.STOCK_ATUAL);
+
+        IF v_stock_fornecer > 0 THEN
+            -- Registo da paragem na máquina
+            INSERT INTO Paragem (
+                ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA,
+                DATA_HORA_CHEGADA, DATA_HORA_SAIDA, TIPO_VISITA
+            )
+            VALUES (
+                seq_paragem.NEXTVAL, v_viagem_id, rec.ID_MAQUINA, v_ordem,
+                SYSTIMESTAMP + NUMTODSINTERVAL(1, 'HOUR'),
+                SYSTIMESTAMP + NUMTODSINTERVAL(1.5, 'HOUR'),
+                'Abastecimento'
+            )
+            RETURNING ID_PARAGEM INTO v_paragem_id;
+
+            -- Registo do detalhe de abastecimento
+            INSERT INTO Abastecimento_Detalhe (
+                ID_ABASTECIMENTO, ID_PARAGEM, ID_PRODUTO, ID_COMPARTIMENTO,
+                QUANTIDADE_ABASTECIDA, STOCK_ANTES_ABAST, STOCK_DEPOIS_ABAST
+            )
+            VALUES (
+                seq_abastecimento.NEXTVAL, v_paragem_id, p_cod_produto, rec.ID_COMPARTIMENTO,
+                v_stock_fornecer, rec.STOCK_ATUAL, rec.STOCK_ATUAL + v_stock_fornecer
+            );
+
+            -- Atualiza a quantidade ainda disponível e incrementa a ordem da próxima paragem
+            v_qtd_disponivel := v_qtd_disponivel - v_stock_fornecer;
+            v_ordem := v_ordem + 1;
+        END IF;
+    END LOOP;
+
+    COMMIT;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20001, 'Erro ao planear viagem: ' || SQLERRM);
+END;
+/
+
+
+
+
+
+/*******************************************************************************
+******************************* TESTES *****************************************
+*******************************************************************************/
+-- Teste 1
+-- Execução normal com produto válido, armazém válido, quantidade suficiente
+BEGIN
+    Q_PROC_2023112690(
+        p_cod_armazem    => 1,       -- Armazém Taveiro (exemplo)
+        p_cod_produto    => 9901,    -- Batatas Lays Originais (exemplo)
+        p_qtd_disponivel => 60,
+        p_raio_km        => 10
+    );
+    DBMS_OUTPUT.PUT_LINE('Teste 1: Executado com sucesso.');
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Teste 1: ERRO - ' || SQLERRM);
+END;
+/
+
+
+-- Teste 2 
+--  Produto inexistente
+BEGIN
+    Q_PROC_2023112690(
+        p_cod_armazem    => 1,
+        p_cod_produto    => 999999, -- Produto que não existe
+        p_qtd_disponivel => 30,
+        p_raio_km        => 10
+    );
+    DBMS_OUTPUT.PUT_LINE('Teste 2: Esperava erro, mas executou.');
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Teste 2: Erro esperado - ' || SQLERRM);
+END;
+/
+
+
+-- Teste 3 
+-- Armazém inexistente
+BEGIN
+    Q_PROC_2023112690(
+        p_cod_armazem    => 999,     -- Armazém que não existe
+        p_cod_produto    => 9901,
+        p_qtd_disponivel => 30,
+        p_raio_km        => 10
+    );
+    DBMS_OUTPUT.PUT_LINE('Teste 3: Esperava erro, mas executou.');
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Teste 3: Erro esperado - ' || SQLERRM);
+END;
+/
+
+
+
+-- Teste 4
+-- Quantidade inválida (negativa)
+BEGIN
+    Q_PROC_2023112690(
+        p_cod_armazem    => 1,
+        p_cod_produto    => 9901,
+        p_qtd_disponivel => -5, -- inválida
+        p_raio_km        => 10
+    );
+    DBMS_OUTPUT.PUT_LINE('Teste 4: Esperava erro, mas executou.');
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Teste 4: Erro esperado - ' || SQLERRM);
+END;
+/
+
+
+
+-- Teste 5 
+-- Sem máquinas dentro do raio
+BEGIN
+    Q_PROC_2023112690(
+        p_cod_armazem    => 1,
+        p_cod_produto    => 9901,
+        p_qtd_disponivel => 30,
+        p_raio_km        => 0.1 -- muito pequeno, sem máquinas próximas
+    );
+    DBMS_OUTPUT.PUT_LINE('Teste 5: Executado com sucesso (sem máquinas no raio).');
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Teste 5: ERRO - ' || SQLERRM);
+END;
+/
+
+
+
+
+
+
+
+
+-- =======================================================================================
+-- =========================== Procedimento Manuel Furtado ==============================
+-- ================================= Q_PROC_2023154006 ===================================
+-- =======================================================================================
+Create or Replace Procedure Q_PROC_2023154006 (p_id_armazem STOCK_ARMAZEM.ID_ARMAZEM%TYPE, p_idproduto STOCK_ARMAZEM.ID_PRODUTO%TYPE, p_quantidade NUMBER)
+IS
+v_armazem_cnt  NUMBER;
+v_produto_cnt  NUMBER;
+v_stock_atual  STOCK_ARMAZEM.STOCK_ATUAL%TYPE;
+v_novo_stock   STOCK_ARMAZEM.STOCK_ATUAL%TYPE;
+Begin
+  Select count(*) Into v_armazem_cnt --Armazem Existente 
+  From Armazem
+  Where ID_ARMAZEM = p_id_armazem;
+  IF v_armazem_cnt = 0 THEN
+    Raise_application_error(-20806, 'Código de armazém inexistente: ' || p_id_armazem);
+  END IF;
+
+  Select count(*) Into v_produto_cnt   --Produto Existente 
+  From Produto
+  Where ID_PRODUTO = p_idproduto;
+  IF v_produto_cnt = 0 THEN
+    Raise_application_error(-20802, 'Código de produto inexistente: ' || p_idproduto);
+  END IF;
+
+  Begin
+    Select STOCK_ATUAL Into v_stock_atual --Saber o Stock Atual
+      From Stock_Armazem
+     Where ID_ARMAZEM = p_id_armazem
+       and ID_PRODUTO = p_idproduto;
+  Exception
+    WHEN NO_DATA_FOUND THEN
+      Raise_application_error(-20820,'Produto '||p_idproduto||' não registado no Armazem '||p_id_armazem);
+  END;
+
+  --Se quantidade = 0 não faz nada 
+  IF p_quantidade = 0 THEN
+    RETURN;
+  END IF;
+
+  -- Calcula novo stock e valida negativo
+  v_novo_stock := v_stock_atual + p_quantidade;
+  IF v_novo_stock < 0 THEN
+    Raise_application_error(-20821,'Operação resultaria em stock negativo. Stock Atual ='||v_stock_atual||', quantidade a subtrir='||p_quantidade);
+  END IF;
+
+  -- Atualiza o stock e timestamps
+  UPDATE Stock_Armazem
+     SET STOCK_ATUAL = v_novo_stock,
+         DATA_ULTIMA_SAIDA   = CASE WHEN p_quantidade < 0 THEN SYSTIMESTAMP ELSE DATA_ULTIMA_SAIDA END,
+         DATA_ULTIMA_ENTRADA = CASE WHEN p_quantidade > 0 THEN SYSTIMESTAMP ELSE DATA_ULTIMA_ENTRADA END
+   WHERE ID_ARMAZEM = p_id_armazem
+     AND ID_PRODUTO = p_idproduto;
+
+  COMMIT;
+
+EXCEPTION
+  WHEN OTHERS THEN
+    ROLLBACK;
+    RAISE; 
+END;
+/
+
+
+-- TESTE 1: Entrada de stock válida (+)
+BEGIN
+  Q_PROC_2023154006(1, 9901,  50);
+END;
+/
+SELECT STOCK_ATUAL
+  FROM Stock_Armazem
+ WHERE ID_ARMAZEM = 1
+   AND ID_PRODUTO = 9901;
+-- Espera: valor antigo + 50
+
+-- TESTE 2: Saída de stock válida (–)
+BEGIN
+  Q_PROC_2023154006(1, 9901, -30);
+END;
+/
+SELECT STOCK_ATUAL
+  FROM Stock_Armazem
+ WHERE ID_ARMAZEM = 1
+   AND ID_PRODUTO = 9901;
+-- Espera: valor anterior – 30
+
+-- TESTE 3: Armazém inexistente
+BEGIN
+  Q_PROC_2023154006(9999, 9901,  10);
+END;
+/
+-- Espera: ORA-20806 “Código de armazém inexistente: 9999”
+
+-- TESTE 4: Produto inexistente
+BEGIN
+  Q_PROC_2023154006(1, 9999, 10);
+END;
+/
+-- Espera: ORA-20802 “Código de produto inexistente: 9999”
+
+
+-- TESTE 5: Operação resultaria em stock negativo
+BEGIN
+  Q_PROC_2023154006(1, 9901, -999999);
+END;
+/
+
+
+
+
+
+
+
+
+
+-- =======================================================================================
+-- =========================== Procedimento Margarida Campos =============================
+-- ================================= Q_PROC_2022137822 ===================================
+-- =======================================================================================
+--Objetivo:
+--regista a saída de um produto de um armazém, 
+--garantindo a atualização correta do stock e da data da última saída.
+
+--param entrada
+--id_armazem (NUMBER): Identificador do armazém de origem.
+--id_produto (NUMBER): Identificador do produto a retirar.
+--quantidade (NUMBER): Quantidade de produto a remover do stock.
+
+
+--registar_saida_produto_armazem
+
+CREATE OR REPLACE PROCEDURE Q_PROC_2022137822 (
+    p_id_armazem IN NUMBER,
+    p_id_produto IN NUMBER,
+    p_quantidade IN NUMBER
+)
+IS
+    armazem_existe  NUMBER;
+    produto_existe  NUMBER;
+    v_stock_atual   Stock_Armazem.STOCK_ATUAL%TYPE;
+BEGIN
+    -- Validar armazém
+    SELECT COUNT(*) INTO armazem_existe
+    FROM armazem
+    WHERE id_armazem = p_id_armazem;
+
+    IF armazem_existe = 0 THEN
+        RAISE_APPLICATION_ERROR(-20806, 'Armazém não existe');
+    END IF;
+
+    -- Validar produto
+    SELECT COUNT(*) INTO produto_existe
+    FROM produto
+    WHERE id_produto = p_id_produto;
+
+    IF produto_existe = 0 THEN
+        RAISE_APPLICATION_ERROR(-20807, 'Produto não existe');
+    END IF;
+
+    -- Verificar stock existente
+    SELECT stock_atual
+    INTO v_stock_atual
+    FROM stock_armazem
+    WHERE id_armazem = p_id_armazem
+      AND id_produto = p_id_produto;
+
+    -- Verificar se há stock suficiente
+    IF v_stock_atual < p_quantidade THEN
+        RAISE_APPLICATION_ERROR(-20808, 'Stock insuficiente. Quantidade disponível: ' || v_stock_atual);
+    END IF;
+
+    -- Atualizar stock e data da última saída
+    UPDATE stock_armazem
+    SET stock_atual = stock_atual - p_quantidade,
+        data_ultima_saida = SYSDATE
+    WHERE id_armazem = p_id_armazem
+      AND id_produto = p_id_produto;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20809, 'Registo de stock inexistente para esse produto nesse armazém');
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20899, 'Erro inesperado: ' || SQLERRM);
+END;
+/
+
+
+
+
+--Verificar stock antes da execução
+SELECT *
+FROM stock_armazem
+WHERE id_armazem = 1 AND id_produto = 9901;
+
+--Executar a procedure
+BEGIN
+  registar_saida_produto_armazem(1, 9901, 5);
+END;
+/
+
+-- Verificar stock após a execução
+SELECT *
+FROM stock_armazem
+WHERE id_armazem = 1 AND id_produto = 9901;
+
+--Testar com stock insuficiente (erro esperado)
+BEGIN
+  registar_saida_produto_armazem(1, 9901, 9999);  -- maior do que o stock existente
+END;
+/
+
+
+--. Testar com produto inexistente (erro esperado)
+BEGIN
+  registar_saida_produto_armazem(1, 9999, 1);  -- id_produto não existente
+END;
+/
+
+--Testar com armazém inexistente (erro esperado)
+BEGIN
+  registar_saida_produto_armazem(9999, 101, 1);  -- id_armazem não existente
+END;
+/
+

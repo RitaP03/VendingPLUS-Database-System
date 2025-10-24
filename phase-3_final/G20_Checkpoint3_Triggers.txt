@@ -1,0 +1,922 @@
+-- =======================================================================================
+-- ======================================= Alínea L) =====================================
+-- =======================================================================================
+--Crie um trigger update_stock que quando é efetuado 
+--a venda um produto, atualize a quantidade desse produto 
+--existente na máquina. 
+
+--Se, após a venda, a máquina ficar completamente vazia, 
+--sem stock de nenhum produto, 
+--deve mudar o estado da máquina para ‘SEM STOCK’
+DROP TRIGGER update_stock;
+
+CREATE OR REPLACE TRIGGER update_stock
+AFTER INSERT ON venda
+FOR EACH ROW
+DECLARE
+    maquina_a       maquina.id_maquina%TYPE;
+    stock_total   NUMBER;
+    id_estado_sem_stock estado_maquina.id_estado%TYPE;
+BEGIN
+    -- Atualizar stock do compartimento
+    UPDATE configuracao_compartimento
+    SET stock_atual = stock_atual - :NEW.quantidade
+    WHERE id_compartimento = :NEW.id_compartimento
+      AND id_produto = :NEW.id_produto;
+
+    -- Obter a máquina da venda (via compartimento)
+    SELECT id_maquina
+    INTO maquina_a
+    FROM compartimento
+    WHERE id_compartimento = :NEW.id_compartimento;
+
+    -- Calcular o stock total da máquina
+    SELECT SUM(c.stock_atual)
+    INTO stock_total
+    FROM configuracao_compartimento c
+    JOIN compartimento cp ON c.id_compartimento = cp.id_compartimento
+    WHERE cp.id_maquina = maquina_a;
+
+    -- Verificar ID do estado 'SEM STOCK'
+    SELECT id_estado
+    INTO id_estado_sem_stock
+    FROM estado_maquina
+    WHERE UPPER(descricao) = 'SEM STOCK';
+
+    -- Se a máquina ficou sem stock total, atualizar estado
+    IF stock_total = 0 THEN
+        UPDATE maquina
+        SET id_estado_atual = id_estado_sem_stock
+        WHERE id_maquina = maquina_a;
+    END IF;
+    
+    EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20812, 'Dados em falta.');
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20999, 'Erro inesperado: ' || SQLERRM);
+    
+  END;
+/
+
+
+
+--testes---------
+SELECT id_compartimento
+FROM compartimento
+WHERE id_maquina = 63;
+
+-- Zera os compartimentos
+UPDATE configuracao_compartimento
+SET stock_atual = 0
+WHERE id_compartimento IN (6302, 6303, 6304);
+
+-- Coloca 1 unidade no 6301
+UPDATE configuracao_compartimento
+SET stock_atual = 1
+WHERE id_compartimento = 6301;
+
+
+--Verifica o stock antes da venda
+
+SELECT c.id_compartimento, c.stock_atual
+FROM configuracao_compartimento c
+WHERE c.id_compartimento IN (6301, 6302, 6303, 6304);
+
+-- Verifica o id_produto no compartimento 6301
+SELECT id_produto
+FROM configuracao_compartimento
+WHERE id_compartimento = 6301;
+
+--Verifica o estado atual da máquina 63
+SELECT m.id_maquina, e.descricao AS estado_atual
+FROM maquina m
+JOIN estado_maquina e ON m.id_estado_atual = e.id_estado
+WHERE m.id_maquina = 63;
+
+--Efetua a venda da última unidade
+INSERT INTO venda (
+    ID_VENDA, ID_MAQUINA, ID_PRODUTO, ID_COMPARTIMENTO,
+    DATA_VENDA, QUANTIDADE, PRECO_UNITARIO_REGISTADO, VALOR_TOTAL,
+    TIPO_PAGAMENTO, ESTADO_VENDA
+) VALUES (
+    seq_venda_aabd.NEXTVAL, 63, 9920, 6301,
+    SYSTIMESTAMP, 1, 1.50, 1.50,
+    'MBWay', 'Concluida'
+);
+
+-- Verifica o stock após a venda
+SELECT c.id_compartimento, c.stock_atual
+FROM configuracao_compartimento c
+WHERE c.id_compartimento IN (6301, 6302, 6303, 6304);
+
+-- Verifica se o estado da máquina mudou para 'SEM STOCK'
+SELECT m.id_maquina, e.descricao AS estado_maquina
+FROM maquina m
+JOIN estado_maquina e ON m.id_estado_atual = e.id_estado
+WHERE m.id_maquina = 63;
+
+
+
+
+
+
+
+
+
+-- =======================================================================================
+-- ======================================= Alínea M) =====================================
+-- =======================================================================================
+-- =======================================================================================
+-- Trigger: ABASTECE
+-- Objetivo: Impedir o registo de quantidades inválidas no abastecimento de produtos.
+--           Valida se a quantidade abastecida não é negativa nem superior à capacidade
+--           definida na configuração ativa do compartimento/produto.
+--           Valida também a existência da configuração, produto e compartimento.
+--
+-- Requisitos:
+--   Não permitir quantidade negativa (-20814)
+--   Não permitir quantidade superior à capacidade definida (-20815)
+--   Detetar configuração inexistente/inativa (-20817)
+--   Detetar compartimento inexistente (-20801)
+--   Detetar produto inexistente (-20802)
+--   Capturar erros inesperados (-20816)
+--
+-- Dispara: Antes de INSERT em Abastecimento_Detalhe
+-- =======================================================================================
+
+CREATE OR REPLACE TRIGGER abastece
+BEFORE INSERT ON Abastecimento_Detalhe
+FOR EACH ROW
+DECLARE
+    -- Guarda a capacidade máxima configurada do compartimento para o produto
+    v_capacidade_max Configuracao_Compartimento.CAPACIDADE_PRODUTO%TYPE;
+
+    -- Variável usada para verificar existência de registros
+    v_dummy NUMBER;
+BEGIN
+    -- Validação 1: verificar se o compartimento existe
+    BEGIN
+        SELECT 1 INTO v_dummy
+        FROM Compartimento
+        WHERE ID_COMPARTIMENTO = :NEW.ID_COMPARTIMENTO;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20801, 'Compartimento inexistente.');
+    END;
+
+    -- Validação 2: verificar se o produto existe
+    BEGIN
+        SELECT 1 INTO v_dummy
+        FROM Produto
+        WHERE ID_PRODUTO = :NEW.ID_PRODUTO;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20802, 'Produto inexistente.');
+    END;
+
+    -- Validação 3: obter a capacidade do compartimento na configuração ativa
+    BEGIN
+        SELECT CAPACIDADE_PRODUTO
+        INTO v_capacidade_max
+        FROM Configuracao_Compartimento
+        WHERE ID_COMPARTIMENTO = :NEW.ID_COMPARTIMENTO
+          AND ID_PRODUTO = :NEW.ID_PRODUTO
+          AND DATA_FIM_CONFIGURACAO IS NULL; -- apenas configurações ativas
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20817, 'Configuração ativa inexistente para o compartimento e produto.');
+    END;
+
+    -- Validação 4: verificar se a quantidade abastecida é negativa
+    IF :NEW.QUANTIDADE_ABASTECIDA < 0 THEN
+        RAISE_APPLICATION_ERROR(-20814, 'Não é permitida quantidade negativa.');
+
+    -- Validação 5: verificar se excede a capacidade do compartimento
+    ELSIF :NEW.QUANTIDADE_ABASTECIDA > v_capacidade_max THEN
+        RAISE_APPLICATION_ERROR(-20815, 'Quantidade abastecida excede a capacidade do compartimento.');
+    END IF;
+
+EXCEPTION
+    -- Captura qualquer erro não antecipado e lança exceção genérica com contexto
+    WHEN OTHERS THEN
+        IF SQLCODE NOT IN (-20801, -20802, -20814, -20815, -20817) THEN
+            RAISE_APPLICATION_ERROR(-20816, 'Erro inesperado no trigger ABASTECE: ' || SQLERRM);
+        ELSE
+            RAISE; -- reencaminha exceções esperadas para serem tratadas fora do trigger
+        END IF;
+END;
+/
+
+
+
+
+
+/*******************************************************************************
+******************************* TESTES *****************************************
+*******************************************************************************/
+
+-- TESTE 1: Inserção VÁLIDA
+-- Espera-se sucesso com dados válidos e configuração ativa
+
+BEGIN
+  DECLARE
+    v_paragem NUMBER;
+  BEGIN
+    SELECT MAX(ID_PARAGEM) INTO v_paragem FROM Paragem;
+
+    INSERT INTO Abastecimento_Detalhe (
+      ID_ABASTECIMENTO, ID_PARAGEM, ID_PRODUTO,
+      ID_COMPARTIMENTO, QUANTIDADE_ABASTECIDA,
+      STOCK_ANTES_ABAST, STOCK_DEPOIS_ABAST
+    )
+    VALUES (
+      seq_abastecimento.NEXTVAL,
+      v_paragem,
+      9901,
+      7872,
+      10,
+      0,
+      10
+    );
+
+    DBMS_OUTPUT.PUT_LINE('TESTE 1: Inserção válida com sucesso.');
+  EXCEPTION
+    WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE('TESTE 1 FALHOU: ' || SQLERRM);
+  END;
+END;
+/
+
+
+
+-- TESTE 2: Quantidade negativa
+-- Deve lançar exceção -20814
+
+BEGIN
+  DECLARE
+    v_paragem NUMBER;
+  BEGIN
+    SELECT MAX(ID_PARAGEM) INTO v_paragem FROM Paragem;
+
+    INSERT INTO Abastecimento_Detalhe (
+      ID_ABASTECIMENTO, ID_PARAGEM, ID_PRODUTO,
+      ID_COMPARTIMENTO, QUANTIDADE_ABASTECIDA,
+      STOCK_ANTES_ABAST, STOCK_DEPOIS_ABAST
+    )
+    VALUES (
+      seq_abastecimento.NEXTVAL,
+      v_paragem,
+      9901,
+      7872,
+      -5,
+      0,
+      -5
+    );
+
+    DBMS_OUTPUT.PUT_LINE('TESTE 2 FALHOU: Aceitou quantidade negativa.');
+  EXCEPTION
+    WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE('TESTE 2: Capturada exceção esperada -> ' || SQLERRM);
+  END;
+END;
+/
+
+
+
+-- TESTE 3: Quantidade acima da capacidade
+-- Deve lançar exceção -20815
+
+BEGIN
+  DECLARE
+    v_paragem NUMBER;
+  BEGIN
+    SELECT MAX(ID_PARAGEM) INTO v_paragem FROM Paragem;
+
+    INSERT INTO Abastecimento_Detalhe (
+      ID_ABASTECIMENTO, ID_PARAGEM, ID_PRODUTO,
+      ID_COMPARTIMENTO, QUANTIDADE_ABASTECIDA,
+      STOCK_ANTES_ABAST, STOCK_DEPOIS_ABAST
+    )
+    VALUES (
+      seq_abastecimento.NEXTVAL,
+      v_paragem,
+      9901,
+      7872,
+      9999,
+      0,
+      9999
+    );
+
+    DBMS_OUTPUT.PUT_LINE('TESTE 3 FALHOU: Aceitou quantidade acima da capacidade.');
+  EXCEPTION
+    WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE('TESTE 3: Capturada exceção esperada -> ' || SQLERRM);
+  END;
+END;
+/
+
+
+
+-- TESTE 4: Compartimento inexistente
+-- Deve lançar exceção -20801
+
+BEGIN
+  DECLARE
+    v_paragem NUMBER;
+  BEGIN
+    SELECT MAX(ID_PARAGEM) INTO v_paragem FROM Paragem;
+
+    INSERT INTO Abastecimento_Detalhe (
+      ID_ABASTECIMENTO, ID_PARAGEM, ID_PRODUTO,
+      ID_COMPARTIMENTO, QUANTIDADE_ABASTECIDA,
+      STOCK_ANTES_ABAST, STOCK_DEPOIS_ABAST
+    )
+    VALUES (
+      seq_abastecimento.NEXTVAL,
+      v_paragem,
+      9901,
+      999999,
+      5,
+      0,
+      5
+    );
+
+    DBMS_OUTPUT.PUT_LINE('TESTE 4 FALHOU: Aceitou compartimento inexistente.');
+  EXCEPTION
+    WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE('TESTE 4: Capturada exceção esperada -> ' || SQLERRM);
+  END;
+END;
+/
+
+
+
+-- TESTE 5: Produto inexistente
+-- Deve lançar exceção -20802
+
+BEGIN
+  DECLARE
+    v_paragem NUMBER;
+  BEGIN
+    SELECT MAX(ID_PARAGEM) INTO v_paragem FROM Paragem;
+
+    INSERT INTO Abastecimento_Detalhe (
+      ID_ABASTECIMENTO, ID_PARAGEM, ID_PRODUTO,
+      ID_COMPARTIMENTO, QUANTIDADE_ABASTECIDA,
+      STOCK_ANTES_ABAST, STOCK_DEPOIS_ABAST
+    )
+    VALUES (
+      seq_abastecimento.NEXTVAL,
+      v_paragem,
+      999999,
+      7872,
+      5,
+      0,
+      5
+    );
+
+    DBMS_OUTPUT.PUT_LINE('TESTE 5 FALHOU: Aceitou produto inexistente.');
+  EXCEPTION
+    WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE('TESTE 5: Capturada exceção esperada -> ' || SQLERRM);
+  END;
+END;
+/
+
+
+
+-- TESTE 6: Configuração inativa
+-- Deve lançar exceção -20817
+-- Verifica que DATA_FIM_CONFIGURACAO IS NOT NULL para o par (105, 8871)
+BEGIN
+  DECLARE
+    v_paragem NUMBER;
+  BEGIN
+    SELECT MAX(ID_PARAGEM) INTO v_paragem FROM Paragem;
+
+    INSERT INTO Abastecimento_Detalhe (
+      ID_ABASTECIMENTO, ID_PARAGEM, ID_PRODUTO,
+      ID_COMPARTIMENTO, QUANTIDADE_ABASTECIDA,
+      STOCK_ANTES_ABAST, STOCK_DEPOIS_ABAST
+    )
+    VALUES (
+      seq_abastecimento.NEXTVAL,
+      v_paragem,
+      8871,
+      105,
+      5,
+      0,
+      5
+    );
+
+    DBMS_OUTPUT.PUT_LINE('TESTE 6 FALHOU: Aceitou configuração inativa.');
+  EXCEPTION
+    WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE('TESTE 6: Capturada exceção esperada -> ' || SQLERRM);
+  END;
+END;
+/
+
+
+
+
+
+
+
+
+
+-- =======================================================================================
+-- ======================================= Alínea N) =====================================
+-- =======================================================================================
+--Crie um trigger update_viagem que quando 
+
+--após o registo da quantidade abastecida de um produto, 
+--deve atualizar a quantidade transportada no veículo, 
+--durante a viagem, em conformidade com a quantidade abastecida.
+
+
+CREATE OR REPLACE TRIGGER update_viagem
+AFTER INSERT ON abastecimento_detalhe
+FOR EACH ROW
+DECLARE
+    id_viagem_a           carga_viagem.id_viagem%TYPE;
+BEGIN
+    -- Obter a viagem associada à paragem
+    SELECT id_viagem
+    INTO id_viagem_a
+    FROM paragem
+    WHERE id_paragem = :NEW.id_paragem;
+
+    -- Atualizar a quantidade no veículo (subtrair o que foi abastecido)
+    UPDATE carga_viagem
+    SET quantidade_atual_veiculo = quantidade_atual_veiculo - :NEW.quantidade_abastecida
+    WHERE id_viagem = id_viagem_a
+      AND id_produto = :NEW.id_produto;
+      
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        -- Se a paragem não existe
+        RAISE_APPLICATION_ERROR(-20852, 'Paragem não encontrada');
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20119, 'Erro inesperado: ' || SQLERRM);
+END;
+/
+
+
+-----testetteet/------
+
+-- Verificar stock atual do veículo para viagem 3 e produto 9920
+SELECT *
+FROM carga_viagem
+WHERE id_viagem = 3 AND id_produto = 9920;
+
+-- Inserir registo de abastecimento que deve disparar a trigger
+INSERT INTO abastecimento_detalhe (
+  id_abastecimento,
+  id_paragem,
+  id_produto,
+  id_compartimento,
+  quantidade_abastecida,
+  stock_antes_abast,
+  stock_depois_abast
+)
+VALUES (
+  seq_abastecimento.NEXTVAL,
+  3,       -- id_paragem válido e existente
+  9920,    -- id_produto (exemplo: MARS)
+  6301,    -- id_compartimento associado ao produto
+  5,       -- quantidade abastecida (quantidade para teste)
+  14,      -- stock antes do abastecimento
+  19       -- stock depois do abastecimento
+);
+
+-- Verificar stock atualizado após inserção do abastecimento
+SELECT *
+FROM carga_viagem
+WHERE id_viagem = 3 AND id_produto = 9920;
+
+-- Ver todos os registos da carga_viagem (opcional)
+SELECT * FROM carga_viagem;
+
+-- Ver registos na tabela abastecimento_detalhe para a paragem 3 e produto 9920
+SELECT *
+FROM abastecimento_detalhe
+WHERE id_paragem = 3 AND id_produto = 9920;
+
+
+
+
+
+
+
+
+
+
+
+
+-- =======================================================================================
+-- ================================ Trigger Ana Pessoa  ==================================
+-- ================================= Q_TRIG_2023112690 ===================================
+-- =======================================================================================
+-- ============================================
+-- TRIGGER: R_TRIG_2023112690
+-- Objetivo: Registar o tempo total que uma máquina esteve em cada estado.
+-- Quando: Após atualização do estado na tabela Log_Estado_Maquina.
+-- Ação: Se o estado mudou, calcula o tempo entre dois estados e atualiza a tabela ESTADO_STATS.
+-- Exceções lançadas:
+--   -20801: Máquina não encontrada
+--   -20802: Estado anterior não encontrado
+--   -20809: Intervalo de tempo negativo
+--   -20991: Erro inesperado na trigger (genérico)
+-- ============================================
+
+
+CREATE OR REPLACE TRIGGER R_TRIG_2023112690
+AFTER UPDATE ON Log_Estado_Maquina
+FOR EACH ROW
+DECLARE
+    v_tempo_em_segundos NUMBER;
+    v_dummy NUMBER;
+BEGIN
+    -- Verifica se houve mudança de estado e se ambas as datas são válidas
+    IF :NEW.ID_ESTADO != :OLD.ID_ESTADO AND
+       :NEW.DATA_INICIO_ESTADO IS NOT NULL AND
+       :OLD.DATA_INICIO_ESTADO IS NOT NULL THEN
+
+        -- Confirma se a máquina existe
+        BEGIN
+            SELECT 1 INTO v_dummy
+            FROM Maquina
+            WHERE ID_MAQUINA = :OLD.ID_MAQUINA;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                RAISE_APPLICATION_ERROR(-20801, 'Código de máquina inexistente');
+        END;
+
+        -- Confirma se o estado anterior existe
+        BEGIN
+            SELECT 1 INTO v_dummy
+            FROM Estado_Maquina
+            WHERE ID_ESTADO = :OLD.ID_ESTADO;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                RAISE_APPLICATION_ERROR(-20802, 'Código de estado inexistente');
+        END;
+
+        -- Calcula o tempo decorrido entre os dois estados, em segundos
+        v_tempo_em_segundos := ROUND(
+            (CAST(:NEW.DATA_INICIO_ESTADO AS DATE) - CAST(:OLD.DATA_INICIO_ESTADO AS DATE)) * 86400
+        );
+
+        -- Valida se o intervalo de tempo é positivo
+        IF v_tempo_em_segundos < 0 THEN
+            RAISE_APPLICATION_ERROR(-20809, 'Intervalo temporal inválido');
+        END IF;
+
+        -- Atualiza tempo acumulado, se já houver registo
+        UPDATE ESTADO_STATS
+        SET TEMPO_TOTAL_ESTADO = NVL(TEMPO_TOTAL_ESTADO, 0) + v_tempo_em_segundos
+        WHERE ID_MAQUINA = :OLD.ID_MAQUINA
+          AND ID_ESTADO = :OLD.ID_ESTADO;
+
+        -- Se não houver registo anterior, insere um novo
+        IF SQL%ROWCOUNT = 0 THEN
+            INSERT INTO ESTADO_STATS (ID_MAQUINA, ID_ESTADO, TEMPO_TOTAL_ESTADO)
+            VALUES (:OLD.ID_MAQUINA, :OLD.ID_ESTADO, v_tempo_em_segundos);
+        END IF;
+    END IF;
+
+EXCEPTION
+    -- Captura qualquer erro não previsto e gera uma exceção genérica
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20991, 'Erro na trigger R_TRIG_2023112690: ' || SQLERRM);
+END;
+/
+
+
+
+
+
+
+/*******************************************************************************
+******************************* TESTES *****************************************
+*******************************************************************************/
+
+
+
+// TESTE 1 //
+-- Atualização válida (espera-se tempo atualizado)
+
+-- Criação de estados e máquina para teste
+INSERT INTO Estado_Maquina (ID_ESTADO, DESCRICAO) VALUES (901, 'TESTE_ON');
+INSERT INTO Estado_Maquina (ID_ESTADO, DESCRICAO) VALUES (902, 'TESTE_OFF');
+INSERT INTO Maquina (ID_MAQUINA, LOCAL, CIDADE, LATITUDE, LONGITUDE, DATA_INSTALACAO, ULTIMA_ATUALIZACAO_STATUS, ID_ESTADO_ATUAL)
+VALUES (9991, 'Máquina Teste 1', 'Coimbra', 40.0, -8.0, SYSDATE, SYSTIMESTAMP, 901);
+
+-- Simular início de estado antigo
+INSERT INTO Log_Estado_Maquina (ID_LOG_ESTADO, ID_MAQUINA, ID_ESTADO, DATA_INICIO_ESTADO)
+VALUES (seq_log_estado.NEXTVAL, 9991, 901, SYSTIMESTAMP - INTERVAL '2' HOUR);
+
+-- Atualizar para novo estado (ativa trigger)
+UPDATE Log_Estado_Maquina
+SET ID_ESTADO = 902,
+    DATA_INICIO_ESTADO = SYSTIMESTAMP
+WHERE ID_MAQUINA = 9991
+  AND ID_ESTADO = 901;
+
+-- Verificar atualização da estatística
+SELECT * FROM ESTADO_STATS WHERE ID_MAQUINA = 9991;
+
+
+
+// TESTE 2 //
+-- Garantir que o estado inválido não existe
+
+-- Garante que o estado 9998 não existe
+DELETE FROM Estado_Maquina WHERE ID_ESTADO = 9998;
+
+-- Verificação direta da lógica da trigger
+BEGIN
+    DECLARE
+        v_dummy NUMBER;
+    BEGIN
+        SELECT 1 INTO v_dummy
+        FROM Estado_Maquina
+        WHERE ID_ESTADO = 9998;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20802, 'Código de estado inexistente');
+    END;
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Erro capturado (simulado -20802): ' || SQLERRM);
+END;
+
+
+
+// TESTE 3 //
+-- Datas inválidas (tempo negativo, espera-se erro -20809)
+-- Criar máquina para o teste
+INSERT INTO Maquina (ID_MAQUINA, LOCAL, CIDADE, LATITUDE, LONGITUDE, DATA_INSTALACAO, ULTIMA_ATUALIZACAO_STATUS, ID_ESTADO_ATUAL)
+VALUES (8888, 'Máquina Teste 2', 'Coimbra', 40.0, -8.0, SYSDATE, SYSTIMESTAMP, 901);
+
+-- Log inicial com timestamp atual
+INSERT INTO Log_Estado_Maquina (ID_LOG_ESTADO, ID_MAQUINA, ID_ESTADO, DATA_INICIO_ESTADO)
+VALUES (seq_log_estado.NEXTVAL, 8888, 901, SYSTIMESTAMP);
+
+-- Atualização com timestamp anterior (deverá falhar)
+BEGIN
+    UPDATE Log_Estado_Maquina
+    SET ID_ESTADO = 902,
+        DATA_INICIO_ESTADO = SYSTIMESTAMP - INTERVAL '5' HOUR
+    WHERE ID_MAQUINA = 8888
+      AND ID_ESTADO = 901;
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Erro capturado (intervalo negativo): ' || SQLERRM);
+END;
+
+
+
+
+
+// TESTE 4 //
+-- Trigger não dispara (estado não mudou)
+-- Novo log com estado 901
+INSERT INTO Log_Estado_Maquina (ID_LOG_ESTADO, ID_MAQUINA, ID_ESTADO, DATA_INICIO_ESTADO)
+VALUES (seq_log_estado.NEXTVAL, 9991, 901, SYSTIMESTAMP - INTERVAL '1' HOUR);
+
+-- Atualização mantendo o mesmo estado (deve ser ignorada pela trigger)
+BEGIN
+    UPDATE Log_Estado_Maquina
+    SET ID_ESTADO = 901,
+        DATA_INICIO_ESTADO = SYSTIMESTAMP
+    WHERE ID_MAQUINA = 9991
+      AND ID_ESTADO = 901;
+
+    DBMS_OUTPUT.PUT_LINE('Update executado — trigger ignorada, como esperado.');
+END;
+
+
+
+
+
+
+
+
+
+
+
+-- =======================================================================================
+-- =============================== Trigger Manuel Furtado ================================
+-- ================================= Q_TRIG_2023154006 ===================================
+-- =======================================================================================
+Create or Replace Trigger TRG_ATUALIZA_DATA_FIM_VIAGEM
+Before UPDATE on Viagem
+FOR EACH ROW
+Begin
+  -- Estado_Viagem não pode ser NULL ou vazio
+  IF :NEW.Estado_Viagem IS NULL OR TRIM(:NEW.Estado_Viagem) = '' THEN
+    RAISE_APPLICATION_ERROR(-20923, 'Erro: Estado_Viagem não pode ser nulo ou vazio.');
+  END IF;
+
+  -- Estado_Viagem deve estar no conjunto permitido
+  IF :NEW.Estado_Viagem NOT IN ('Planejada', 'Em Andamento', 'Concluída', 'Cancelada') THEN
+    RAISE_APPLICATION_ERROR(-20924, 'Erro: Estado_Viagem inválido. Valores válidos: Planejada, Em Andamento, Concluída, Cancelada.');
+  END IF;
+
+  -- Se mudar para "Concluída" e Data_Hora_Fim estiver NULL, atualiza Data_Hora_Fim
+  IF :OLD.Estado_Viagem <> 'Concluída' AND :NEW.Estado_Viagem = 'Concluída' THEN
+    IF :OLD.Data_Hora_Fim IS NOT NULL THEN
+      RAISE_APPLICATION_ERROR(-20925, 'Erro: Data_Hora_Fim já preenchida, não pode ser alterada.');
+    ELSE
+      :NEW.Data_Hora_Fim := SYSTIMESTAMP;
+    END IF;
+  END IF;
+
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE_APPLICATION_ERROR(-20922, 'Erro inesperado: ' || SQLERRM);
+END TRG_ATUALIZA_DATA_FIM_VIAGEM;
+/
+
+
+--Teste Trigger 
+INSERT INTO Viagem (
+  ID_Viagem,
+  ID_Funcionario,
+  Matricula_Veiculo,
+  ID_Armazem_Origem,
+  ID_Armazem_Fim,
+  ID_Rota,
+  Data_Hora_Inicio,
+  Data_Hora_Fim,
+  Distancia_Total_Km,
+  Estado_Viagem
+) VALUES (
+  9000,       -- gera novo ID
+  101,                      -- funcionário válido (ex.: “Carlos Mota”)
+  'AA-11-BB',               -- veículo válido
+  1,                        -- armazém de origem
+  2,                        -- armazém de destino
+  NULL,                     -- sem rota predefinida
+  SYSTIMESTAMP - INTERVAL '2' HOUR,  -- início há 2h
+  NULL,                     -- Data_Hora_Fim fica nulo
+  0,                        -- distância inicial 0
+  'Planeada'               -- status inicial “Planejada”
+);
+COMMIT;
+
+
+
+
+INSERT INTO Viagem (
+  ID_Viagem,
+  ID_Funcionario,
+  Matricula_Veiculo,
+  ID_Armazem_Origem,
+  ID_Armazem_Fim,
+  ID_Rota,
+  Data_Hora_Inicio,
+  Data_Hora_Fim,        -- explicitamente NULL
+  Distancia_Total_Km,
+  Estado_Viagem
+) VALUES (
+  9999,                          -- ou seq_viagem.NEXTVAL
+  101,                           -- funcionário de exemplo
+  'AA-11-BB',                    -- matrícula de exemplo
+  1,                             -- armazém origem
+  2,                             -- armazém destino
+  NULL,                          -- rota (pode ser NULL)
+  TO_TIMESTAMP('2025-05-29 21:54:28','YYYY-MM-DD HH24:MI:SS'),
+  NULL,                          -- campo Data_Hora_Fim fica NULL
+  0,
+  'Planeada'                    -- estado inicial (não dispara o trigger aqui)
+);
+COMMIT;
+
+
+SELECT ID_Viagem,
+       TO_CHAR(Data_Hora_Inicio,'DD.MM.YY HH24:MI:SSxFF') AS Data_Hora_Inicio,
+       TO_CHAR(Data_Hora_Fim   ,'DD.MM.YY HH24:MI:SSxFF') AS Data_Hora_Fim,
+       Estado_Viagem
+  FROM Viagem
+ WHERE ID_Viagem = 9000;
+ 
+ 
+ UPDATE Viagem
+   SET Estado_Viagem = 'Concluída'
+ WHERE ID_Viagem = 9000;
+COMMIT;
+
+SELECT ID_Viagem,
+       TO_CHAR(Data_Hora_Inicio,'DD.MM.YY HH24:MI:SSxFF') AS Data_Hora_Inicio,
+       TO_CHAR(Data_Hora_Fim   ,'DD.MM.YY HH24:MI:SSxFF') AS Data_Hora_Fim,
+       Estado_Viagem
+  FROM Viagem
+ WHERE ID_Viagem = 9000;
+ 
+
+
+
+
+
+
+-- =======================================================================================
+-- ============================== Trigger Margarida Campos  ==============================
+-- ================================= Q_TRIG_2022137822 ===================================
+-- =======================================================================================
+--Criar uma trigger que atualize automaticamente a taxa de ocupação 
+--de um compartimento sempre que ocorra uma venda ou um reabastecimento de produto. 
+--A taxa de ocupação será calculada como a proporção entre a quantidade 
+--atual e a capacidade máxima, expressa em percentagem.
+
+
+--TAXA_OCUPACAO = (QTD_ATUAL / CAP_MAX) * 100
+
+CREATE OR REPLACE TRIGGER R_TRIG_2022137822
+AFTER INSERT ON VENDA
+FOR EACH ROW
+DECLARE
+  v_stock_atual NUMBER;
+  v_capacidade   NUMBER;
+BEGIN
+  -- Atualiza o stock
+  UPDATE Configuracao_Compartimento
+  SET STOCK_ATUAL = STOCK_ATUAL - :NEW.QUANTIDADE
+  WHERE ID_COMPARTIMENTO = :NEW.ID_COMPARTIMENTO;
+
+  -- Vai buscar os novos valores
+  SELECT STOCK_ATUAL, CAPACIDADE_PRODUTO
+  INTO v_stock_atual, v_capacidade
+  FROM Configuracao_Compartimento
+  WHERE ID_COMPARTIMENTO = :NEW.ID_COMPARTIMENTO;
+
+  -- Atualiza a taxa de ocupação
+  UPDATE Configuracao_Compartimento
+  SET TAXA_OCUPACAO = ROUND((v_stock_atual / v_capacidade) * 100, 2)
+  WHERE ID_COMPARTIMENTO = :NEW.ID_COMPARTIMENTO;
+EXCEPTION
+  WHEN NO_DATA_FOUND THEN
+    RAISE_APPLICATION_ERROR(-20001, 'Compartimento não encontrado para ID: ' || :NEW.ID_COMPARTIMENTO);
+    
+  WHEN OTHERS THEN
+
+    RAISE_APPLICATION_ERROR(-20003, 'Erro: ' || SQLERRM);
+END;
+/
+
+
+
+--ver se funciiona
+--ver antes
+SELECT 
+  ID_COMPARTIMENTO, 
+  STOCK_ATUAL, 
+  CAPACIDADE_PRODUTO, 
+  TAXA_OCUPACAO
+FROM 
+  Configuracao_Compartimento
+WHERE 
+  ID_COMPARTIMENTO = 101;
+  
+--vendaaaaaa
+INSERT INTO Venda (
+  ID_VENDA, ID_MAQUINA, ID_PRODUTO, ID_COMPARTIMENTO,
+  DATA_VENDA, QUANTIDADE, PRECO_UNITARIO_REGISTADO, VALOR_TOTAL,
+  TIPO_PAGAMENTO, ESTADO_VENDA
+) VALUES (
+  seq_venda_aabd.NEXTVAL, 1, 9901, 101,
+  SYSDATE, 1, 1.20, 1.20,
+  'MBWay', 'Concluida'
+);
+
+
+UPDATE Configuracao_Compartimento
+SET STOCK_ATUAL = 12
+WHERE ID_COMPARTIMENTO = 101;
+
+--veeee
+SELECT 
+  ID_COMPARTIMENTO,
+  STOCK_ATUAL,
+  CAPACIDADE_PRODUTO,
+  TAXA_OCUPACAO
+FROM 
+  Configuracao_Compartimento
+WHERE 
+  ID_COMPARTIMENTO = 101;
+  
+  
+  
+  UPDATE Maquina
+SET ID_ESTADO_ATUAL = 1
+WHERE ID_MAQUINA = 1;
+  
+  SELECT * FROM Maquina WHERE ID_MAQUINA = 1;
+  SELECT * FROM Estado_Maquina WHERE ID_ESTADO = 1;
+
+
+
+

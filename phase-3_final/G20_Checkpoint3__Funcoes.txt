@@ -1,0 +1,1283 @@
+-- =======================================================================================
+-- ======================================= Alínea A) =====================================
+-- =======================================================================================
+
+--Crie a função quantidade_vendida, que recebe o código de uma máquina, a referência de um produto,
+--e um intervalo temporal, a data de inicio e a data de fim (por defeito a data atual), e retorna a quantidade
+--vendida desse produto, nessa máquina nesse período. A função deve retornar as seguintes exceções: -
+--20801, -20802 , -20809
+Create or Replace Function quantidade_vendida(idMaquina NUMBER, idproduto NUMBER, datainicio DATE, datafim DATE DEFAULT SYSDATE)
+Return NUMBER 
+IS
+vquantidadetotal NUMBER := 0; --quantidadetotal
+vproduto NUMBER; --numero produto
+vmaquina NUMBER; --vmaquina
+vestado estado_Maquina.descricao%TYPE;
+Begin
+    Begin
+    Select count(*) Into vmaquina --Calcula a quantidade maquinas com aquele id
+    From Maquina
+    Where Maquina.ID_Maquina = idMaquina;
+    Exception
+    WHEN NO_DATA_FOUND THEN --Se a máquina não existe dá erro
+    Raise_application_error(-20801, 'Código de máquina inexistente: ' || idMaquina);
+    END;
+    
+    Begin
+    Select count(*) Into vproduto
+    From Produto
+    Where ID_PRODUTO = idproduto;
+    Exception
+    WHEN NO_DATA_FOUND THEN --Igual que com a máquina vemos se existe o produto
+    Raise_application_error(-20802, 'Código de produto inexistente: ' || idproduto);
+    END;
+    IF datainicio > datafim THEN --Se a data de inicio é maior que a data de fim lança um erro
+    Raise_application_error(-20809, 'Intervalo temporal inválido: data início maior que data fim');
+    ELSIF datainicio > SYSDATE THEN
+    Raise_application_error(-20816, 'Data de início superior à data atual');
+    END IF;
+    
+    Begin
+    Select em.descricao Into vestado --Busca o estado da maquina
+    From Maquina m
+    Join estado_Maquina em on m.id_estado_atual = em.id_estado
+    Where m.id_Maquina = idMaquina;
+    IF vestado <> 'Operacional' THEN --Se não estiver Operacional lança erro
+    Raise_application_error(-20814, 'Máquina ' || idMaquina || ' não está operacional');
+    END IF;
+    Exception
+    WHEN NO_DATA_FOUND THEN   --Sem estado
+    Raise_application_error(-20801, 'Código de máquina inexistente (estado): ' || idMaquina);
+    END;
+    Select Sum(quantidade) Into vquantidadetotal --Se não lança erro nenhum clacula-se a quantidade total de vendas
+    From Venda
+    Where id_Maquina = idMaquina
+    and id_produto = idproduto
+    and data_venda Between datainicio and datafim;
+    Return vquantidadetotal;
+Exception
+WHEN OTHERS THEN
+Raise_application_error(-20819, 'Erro inesperado: ' || SQLERRM); --Outros erros 
+END;
+/
+
+
+--Testes alínea a)
+
+-- TESTE 1 – Quantidade vendida entre duas datas, máquina e produto válidos
+-- Espera-se um número (possivelmente NULL se não houver vendas)
+
+Select quantidade_vendida(1, 9901, TO_DATE('2024-01-01', 'YYYY-MM-DD'), SYSDATE) AS qtd_vendida
+From dual;
+
+-- TESTE 2 – Máquina inválida
+-- Espera-se: ORA-20801
+
+Select quantidade_vendida(9999, 9901, TO_DATE('2024-01-01', 'YYYY-MM-DD'), SYSDATE)
+From dual;
+
+
+-- TESTE 4 – Intervalo de tempo inválido
+-- Espera-se: ORA-20809
+
+Select quantidade_vendida(1, 9901, TO_DATE('2025-12-31', 'YYYY-MM-DD'), TO_DATE('2025-01-01', 'YYYY-MM-DD'))
+From dual;
+
+
+-- TESTE 5 – Data início maior que o tempo atual
+-- Espera-se: ORA-20816
+
+Select quantidade_vendida(1, 9901, SYSDATE + 1, SYSDATE + 2)
+From dual;
+
+
+
+-- TESTE 6 – Máquina em estado não operacional
+-- Espera-se: ORA-20814
+
+Select quantidade_vendida(999, 9901, TO_DATE('2024-01-01', 'YYYY-MM-DD'), SYSDATE)
+From dual;
+
+
+
+
+
+-- =======================================================================================
+-- ======================================= Alínea B) =====================================
+-- =======================================================================================
+
+--Crie a função quantidade_em_falta, que recebe o código de uma máquina e a referência de um
+--produto, e retorna a quantidade em falta desse produto nessa máquina. A quantidade em falta é a
+--diferença entre a capacidade máxima definida para essa máquina e a quantidade existente. A função
+--deve retornar as seguintes exceções: -20801, -20802
+
+Create or Replace Function quantidade_em_falta(idMaquina  NUMBER,idproduto  NUMBER)
+Return NUMBER
+IS
+vquantidadeemfalta NUMBER := 0; --quantidade em falta na máquina
+vcapacidadetotal   NUMBER := 0; --capacidade total da máquina
+vstocktotal        NUMBER := 0; --Stock total 
+vmaquina NUMBER; --Numero de Maquinas
+vproduto NUMBER; --Número de Pordutos
+Begin
+    Begin
+    Select 1 Into vmaquina -- Existem maquinas
+    From Maquina
+    Where id_Maquina = idMaquina;
+    Exception
+    WHEN NO_DATA_FOUND THEN
+    Raise_application_error(-20801, 'Código de máquina inexistente: ' || idMaquina);
+    END;
+    
+    Begin
+    Select count(*) Into vproduto --Existem produtos
+    From Produto
+    Where id_produto = idproduto;
+    Exception
+    WHEN NO_DATA_FOUND THEN
+    Raise_application_error(-20802, 'Código de produto inexistente: ' || idproduto);
+    END;
+    
+    Select --calcula-se a capacidade total e stockvtotal do produto na maquina
+    Sum(cc.capacidade_produto), 
+    Sum(cc.stock_atual)
+    Into vcapacidadetotal, vstocktotal
+    From Configuracao_Compartimento cc
+    Join Compartimento c on cc.id_compartimento = c.id_compartimento
+    Where c.id_Maquina = idMaquina
+    and cc.id_produto = idproduto
+    and cc.data_fim_configuracao is NULL;
+    vquantidadeemfalta := vcapacidadetotal - vstocktotal; -- A qauntidade em falta é o resultado de subtrair à capacidade total da maquina o stock atual desse produtovquantidadeemfalta;
+    Return vquantidadeemfalta;
+Exception
+WHEN OTHERS THEN
+Raise_application_error(-20843, 'Erro inesperado ');
+END;
+/
+
+
+--Testes b) 
+-- TESTE 1 – Verifica a quantidade em falta de um produto numa máquina válida
+-- Espera-se: valor >= 0 (diferença entre capacidade e stock atual)
+
+Select quantidade_em_falta(1, 9903) AS quantidade_em_falta
+From dual;
+
+
+
+
+-- =======================================================================================
+-- ======================================= Alínea C) =====================================
+-- =======================================================================================
+
+--Crie a função quantidade_media_diaria, que recebe o código de uma máquina e a referência de um
+--produto, e retorna a quantidade média diária vendida desde o penúltimo reabastecimento desse produto
+--nessa máquina. A função deve retornar as seguintes exceções: -20801, -20802
+
+Create or Replace Function quantidade_media_diaria(idMaquina  NUMBER,idproduto  NUMBER) 
+Return NUMBER
+IS
+  vdata_ultimo     TIMESTAMP;   -- Data ultimo reabastecimento
+  vdata_penultimo  TIMESTAMP;   -- Data penultimoreabastecimento 
+  vtotalvendido    NUMBER := 0; -- Total vendido 
+  vnumdias         NUMBER := 0; -- Dias entre penúltimo e atual 
+  vmedia           NUMBER := 0; -- Média diária
+  vmaquina         NUMBER;      -- Variável maquina 
+  vproduto         NUMBER;      -- produto existe 
+Begin
+
+  Begin
+    Select 1 Into vmaquina
+      From Maquina
+     Where ID_Maquina = idMaquina;
+  Exception
+    WHEN NO_DATA_FOUND THEN
+      Raise_application_error(-20801,'Código de máquina inexistente: ' || idMaquina);
+  END;
+
+  Begin
+    Select 1 Into vproduto
+      From Produto
+     Where ID_PRODUTO = idproduto;
+  Exception
+    WHEN NO_DATA_FOUND THEN
+      Raise_application_error(-20802,'Código de produto inexistente: ' || idproduto);
+  END;
+
+  Select max(pg.data_hora_saida)
+    Into vdata_ultimo
+    From Abastecimento_Detalhe ad
+    Join Paragem pg on ad.ID_Paragem = pg.ID_Paragem
+    Where pg.ID_Maquina = idMaquina
+     and ad.ID_PRODUTO = idproduto
+     and ad.Quantidade_Abastecida > 0;
+
+  IF vdata_ultimo IS NULL THEN
+    -- Não houve nenhum abastecimento
+    Raise_application_error(-20857,'Sem abastecimento');
+  END IF;
+
+  Select max(pg.data_hora_saida) Into vdata_penultimo
+     From Abastecimento_Detalhe ad
+     Join Paragem pg on ad.ID_Paragem = pg.ID_Paragem
+     Where pg.ID_Maquina = idMaquina
+     and ad.ID_PRODUTO = idproduto
+     and ad.Quantidade_Abastecida > 0
+     and pg.data_hora_saida < vdata_ultimo;
+
+  IF vdata_penultimo IS NULL THEN
+    -- Só houve um abastecimento 
+    Raise_application_error(-20857,'Sem abastecimento');
+  END IF;
+
+  Select Sum(quantidade) Into vtotalvendido --totalvendido do produto na maquina nesse intervalo de tempo 
+    From Venda
+   Where ID_Maquina = idMaquina
+    and ID_Produto = idproduto
+    and Data_Venda between vdata_penultimo 
+    and SYSTIMESTAMP;
+
+  vnumdias := TRUNC(SYSTIMESTAMP) - TRUNC(vdata_penultimo);
+
+  IF vnumdias <= 0 THEN -- Dias Negativos Error 
+   Return 0;
+  ELSE
+    vmedia := vtotalvendido / vnumdias;
+  END IF;
+
+  Return Round(vmedia, 2);
+
+Exception
+  WHEN OTHERS THEN
+  IF SQLCODE IN (-20801, -20802, -20857) THEN
+      RAISE;
+    ELSE
+      Raise_application_error(-20847, 'Ocorreu um erro inesperado: ');
+      END IF;
+END;
+/
+
+-- TESTE 1 – Máquina e produto válidos, com histórico de abastecimentos e vendas
+-- (Supondo que existam pelo menos dois abastecimentos e algumas vendas)
+SELECT quantidade_media_diaria(1, 9901) AS media_diaria
+FROM dual;
+/  
+-- Espera-se: valor numérico (média diária) ou 0 se não houver dias positivos
+
+-- TESTE 2 – Máquina inválida ? ORA-20801
+SELECT quantidade_media_diaria(9999, 9901) AS media_diaria
+FROM dual;
+/  
+-- Esperado:
+--   ORA-20801: Código de máquina inexistente: 9999
+
+-- TESTE 3 – Produto inválido ? ORA-20802
+SELECT quantidade_media_diaria(1, 9999) AS media_diaria
+FROM dual;
+/  
+-- Esperado:
+--   ORA-20802: Código de produto inexistente: 9999
+
+
+
+
+-- =======================================================================================
+-- ======================================= Alínea D) =====================================
+-- =======================================================================================
+
+--Crie a função data_ultimo_abastec, que recebe o código de uma máquina e a referência de um
+--produto, e retorna a data do último reabastecimento dessa máquina com esse produto. A função deve
+--retornar as seguintes exceções: -20801, -20802
+Create or Replace Function data_ultimo_abastecimento(idMaquina  NUMBER,idproduto  NUMBER) 
+Return DATE
+IS
+vMaquina  NUMBER; --Para contar maquina
+vproduto  NUMBER; --Para contar produtos 
+vdatareabastecimento DATE;
+Begin
+    Select Count(*) Into vMaquina --Maquina Existe 
+    From Maquina
+    Where ID_Maquina = idMaquina;
+    IF vMaquina = 0 THEN
+        Raise_application_error(-20801, 'Código de máquina inexistente: ' || idMaquina); 
+    END IF;
+
+    Select Count(*) Into vproduto --Produto existe 
+    From Produto
+    Where ID_PRODUTO = idproduto;
+    IF vproduto = 0 THEN
+        Raise_application_error(-20802, 'Código de produto inexistente: ' || idproduto);
+    END IF;
+
+    Begin
+    Select MAX(pg.DATA_HORA_SAIDA) Into vdatareabastecimento
+    From Abastecimento_Detalhe ad
+    Join Paragem pg on ad.ID_PARAGEM = pg.ID_PARAGEM
+    Where pg.ID_Maquina = idMaquina
+    and ad.ID_PRODUTO = idproduto
+    and ad.QUANTIDADE_ABASTECIDA > 0;
+    IF vdatareabastecimento IS NULL THEN
+         Raise_application_error(-20819, 'Sem reabastecimentos registados para a máquina ' || idMaquina);
+    END IF;
+    Exception
+    WHEN NO_DATA_FOUND THEN
+    Raise_application_error(-20819, 'Sem reabastecimentos registados para a máquina ' || idMaquina);
+    END;
+    Return vdatareabastecimento;
+Exception
+WHEN OTHERS THEN
+Raise_application_error(-20849, 'Erro inesperado: ' || SQLERRM);
+END;
+/
+
+
+--Testes d)
+
+-- TESTE 1 – Último reabastecimento de um produto numa máquina válida
+-- Espera-se: uma data/hora (TIMESTAMP) do último abastecimento
+
+Select data_ultimo_abastecimento(1, 9901) AS data_ultimo
+From dual;
+
+
+-- TESTE 2 – Código de máquina inexistente
+-- Espera-se: ORA-20801
+
+Select data_ultimo_abastecimento(9999, 9901)
+From dual;
+
+
+-- TESTE 3 – Código de produto inexistente
+-- Espera-se: ORA-20802
+
+Select data_ultimo_abastec(1, 9999)
+From dual;
+
+
+
+
+-- =======================================================================================
+-- ======================================= Alínea E) =====================================
+-- =======================================================================================
+
+--Crie a função distancia_entre_maquinas, que recebe o código de duas máquinas e retorna a distância
+--linear entre essas duas máquinas. A função deve retornar as seguintes exceções: -20801, -20810
+Create or Replace Function distancia_entre_Maquinas( idMaquina1 NUMBER,idMaquina2 NUMBER) 
+Return NUMBER
+IS
+  v_lat1       Maquina.Latitude%TYPE;    -- Precisamos destes dados todos para chamar a função
+  v_long1      Maquina.Longitude%TYPE;   
+  v_lat2       Maquina.Latitude%TYPE;    
+  v_long2      Maquina.Longitude%TYPE;   
+  v_distancia  NUMBER;  
+  
+Begin
+
+  IF idMaquina1 = idMaquina2 THEN --Maquinas iguais 
+    Raise_application_error(-20810, 'Máquinas inválidas. IDs coincidem: '||idMaquina1);
+  END IF;
+
+  Begin
+    Select Latitude, Longitude
+      Into v_lat1, v_long1
+      From Maquina
+     Where ID_Maquina = idMaquina1;
+  Exception
+    WHEN NO_DATA_FOUND THEN --Maquina 1 Inexistentes 
+      Raise_application_error(-20801,'Código de máquina 1 inexistente: '||idMaquina1);
+  END;
+  
+  Begin
+    Select Latitude, Longitude
+      Into v_lat2, v_long2
+      From Maquina
+     Where ID_Maquina = idMaquina2;
+  Exception
+    WHEN NO_DATA_FOUND THEN --Maquina 2 Inexistente 
+      RAISE_APPLICATION_ERROR(-20801,'Código de máquina 2 inexistente: ' || idMaquina2);
+  END;
+
+  IF v_lat1 is NULL OR v_long1 is NULL OR v_lat2 IS NULL OR v_long2 is NULL THEN --Coordenadas Invalidas 
+    Raise_application_error(-20818,'Coordenadas inválidas em uma ou ambas as máquinas.');
+  END IF;
+
+  v_distancia := distancia_linear(lat1  => v_lat1,long1 => v_long1,lat2  => v_lat2,long2 => v_long2);
+  RETURN ROUND(v_distancia, 1);
+
+Exception
+  WHEN OTHERS THEN
+      IF SQLCODE IN (-20810, -20801, -20818) THEN
+      RAISE;
+    ELSE
+      Raise_application_error(-20849, 'Erro inesperado');
+    END IF;
+END;
+/
+
+
+-- TESTE 1 – Execução funcional (IDs válidos com lat/long não-nulos)
+SELECT distancia_entre_Maquinas(1, 1003) AS distancia_km
+FROM dual;
+/  
+
+-- TESTE 2 – IDs iguais ? ORA-20810
+SELECT distancia_entre_Maquinas(1, 1) AS distancia_km
+FROM dual;
+/  
+
+-- TESTE 3 – Primeira máquina inexistente ? ORA-20801
+SELECT distancia_entre_Maquinas(9999, 2) AS distancia_km
+FROM dual;
+/  
+
+-- TESTE 4 – Segunda máquina inexistente ? ORA-20801
+SELECT distancia_entre_Maquinas(1, 9999) AS distancia_km
+FROM dual;
+/  
+
+
+
+
+-- =======================================================================================
+-- ======================================= Alínea F) =====================================
+-- =======================================================================================
+CREATE function distancia(LAT1  NUMBER,LON1  NUMBER,LAT2  NUMBER,LON2  NUMBER) 
+RETURN NUMBER
+IS
+    R NUMBER := 6371; -- Raio da Terra em Kms
+    PI CONSTANT NUMBER := 3.141592653589793;
+    D_LAT NUMBER ;
+    D_LON NUMBER ;
+    A NUMBER ;
+    D NUMBER ;
+BEGIN
+    D_LAT := (LAT2 - LAT1) * PI / 180;
+    D_LON := (LON2 - LON1) * PI / 180;
+    A := SIN(D_LAT/2) * SIN(D_LAT/2) + COS(LAT1*PI/180) * COS(LAT2*PI/180) * SIN(D_LON/2) * SIN(D_LON/2);
+    D := R * (2 * ATAN2(SQRT(A), SQRT(1 - A)));
+    RETURN ROUND(D,3);
+END;        
+/       
+
+--Crie a função distancia_viagem, que recebe 
+--o código de uma viagem de abastecimento, 
+
+--e considerando a sequência das máquinas visitadas, 
+--retorna a distância total da viagem. (return number)
+--Assuma que a viagem termina no armazém onde a viagem iniciou. 
+--A função deve retornar as seguintes exceções: -20807
+
+
+--ver se a viagem existe com o count
+--distancia total = soma de todas as paregens de uma viagem, idviagem=idviagem da paragem que nos foi dado
+--dps com a função da ficha da aula csg fazer a ssoma de onde ficamos (ult máquina) e o armzém de origem
+drop function distancia_viagem;
+
+CREATE OR REPLACE FUNCTION distancia_viagem(p_id_viagem IN NUMBER)
+RETURN NUMBER
+IS
+    distancia_total NUMBER;
+    viagem_existe NUMBER;
+
+    -- Coordenadas
+    latitude_maquina NUMBER;
+    longitude_maquina NUMBER;
+    
+    
+    latitude_armazem NUMBER;
+    longitude_armazem NUMBER;
+    
+    
+BEGIN
+    -- Verificar se a viagem existe
+    SELECT COUNT(*) INTO viagem_existe
+    FROM viagem
+    WHERE id_viagem = p_id_viagem;
+
+    IF viagem_existe = 0 THEN
+        RAISE_APPLICATION_ERROR(-20807, 'Viagem não foi encontrada.');
+    END IF;
+
+    -- Somar as distâncias entre paragens
+    SELECT SUM(DISTANCIA_PERCORRIDA_KM)
+    INTO distancia_total
+    FROM paragem
+    WHERE ID_VIAGEM = p_id_viagem;
+
+    -- Obter coordenadas da última máquina visitada
+    SELECT m.LATITUDE, m.LONGITUDE INTO latitude_maquina, longitude_maquina
+    FROM paragem p
+    JOIN maquina m ON p.ID_MAQUINA = m.ID_MAQUINA
+    WHERE p.ID_VIAGEM = p_id_viagem
+      AND p.ORDEM_VISITA = (
+          SELECT MAX(ORDEM_VISITA)
+          FROM paragem
+          WHERE ID_VIAGEM = p_id_viagem
+      );
+
+    -- Obter coordenadas do armazém de origem
+    SELECT a.LATITUDE, a.LONGITUDE
+    INTO latitude_armazem, longitude_armazem
+    FROM viagem v
+    JOIN armazem a ON v.ID_ARMAZEM_ORIGEM = a.ID_ARMAZEM
+    WHERE v.ID_VIAGEM = p_id_viagem;
+
+    -- Somar distância final ao armazém
+    distancia_total := distancia_total +
+        distancia(latitude_maquina, longitude_maquina, latitude_armazem, longitude_armazem);
+
+    RETURN distancia_total;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Erro: ' || SQLERRM);
+END;
+/
+
+
+
+//testes para ver se estãn a correr bem
+
+
+--teste 1 funciona
+SELECT 2 AS id_viagem, distancia_viagem(3) AS distancia_km 
+FROM dual;
+
+--teste2 erro da viagem n exestir
+SELECT distancia_viagem(9999) FROM dual;
+
+-- Teste 3: viagem com distância nula
+-- Inserir uma viagem com distância a NULL para teste
+SELECT distancia_viagem(9998) AS distancia_km FROM dual;
+
+
+--Verificar coordenadas da última máquina da viagem
+SELECT m.ID_MAQUINA, m.LATITUDE, m.LONGITUDE
+FROM paragem p
+JOIN maquina m ON p.ID_MAQUINA = m.ID_MAQUINA
+WHERE p.ID_VIAGEM = 3
+  AND p.ORDEM_VISITA = (
+      SELECT MAX(ORDEM_VISITA)
+      FROM paragem
+      WHERE ID_VIAGEM = 3
+  );
+
+
+--Verificar coordenadas do armazém de origem da viagem
+SELECT a.ID_ARMAZEM, a.LATITUDE, a.LONGITUDE
+FROM viagem v
+JOIN armazem a ON v.ID_ARMAZEM_ORIGEM = a.ID_ARMAZEM
+WHERE v.ID_VIAGEM = 3;
+
+
+
+
+
+
+
+-- =======================================================================================
+-- ======================================= Alínea G) =====================================
+-- =======================================================================================
+-- ============================================
+-- Função: MAQUINA_MAIS_PROXIMA
+-- Objetivo:
+--   Devolver o código da máquina mais próxima de um ponto geográfico
+--   que tenha o produto indicado disponível para venda.
+--
+-- Parâmetros:
+--   - idproduto: código do produto a localizar
+--   - lat: latitude do ponto de referência (deve estar entre -90 e 90)
+--   - plong: longitude do ponto de referência (deve estar entre -180 e 180)
+--
+-- Retorna:
+--   - ID_MAQUINA mais próxima com stock > 0
+--
+-- Exceções tratadas:
+--   -20802: Produto não existe ou não disponível em nenhuma máquina
+--   -20814: Coordenadas inválidas (nulas ou fora dos limites geográficos)
+--
+-- Notas:
+--   - Apenas são consideradas configurações ativas (DATA_FIM_CONFIGURACAO IS NULL)
+--   - Apenas são consideradas máquinas com stock disponível (> 0)
+-- ============================================
+
+CREATE OR REPLACE FUNCTION maquina_mais_proxima(
+    idproduto IN NUMBER,
+    lat       IN NUMBER,
+    plong     IN NUMBER
+) RETURN NUMBER
+IS
+    resultado NUMBER;
+    v_dummy   NUMBER;
+BEGIN
+    -- Verifica se o produto existe
+    SELECT 1 INTO v_dummy
+    FROM Produto
+    WHERE ID_PRODUTO = idproduto;
+
+    -- Valida coordenadas
+    IF lat IS NULL OR plong IS NULL OR lat < -90 OR lat > 90 OR plong < -180 OR plong > 180 THEN
+        RAISE_APPLICATION_ERROR(-20814, 'Coordenadas inválidas (nulas ou fora do intervalo geográfico permitido).');
+    END IF;
+
+    -- Seleciona a máquina mais próxima com o produto disponível
+    SELECT ID_MAQUINA
+    INTO resultado
+    FROM (
+        SELECT m.ID_MAQUINA,
+               SQRT(POWER(m.LATITUDE - lat, 2) + POWER(m.LONGITUDE - plong, 2)) AS distancia
+        FROM Maquina m
+        JOIN Compartimento c ON m.ID_MAQUINA = c.ID_MAQUINA
+        JOIN Configuracao_Compartimento conf ON c.ID_COMPARTIMENTO = conf.ID_COMPARTIMENTO
+        WHERE conf.ID_PRODUTO = idproduto
+          AND conf.STOCK_ATUAL > 0
+          AND conf.DATA_FIM_CONFIGURACAO IS NULL
+        ORDER BY distancia
+    )
+    WHERE ROWNUM = 1;
+
+    RETURN resultado;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20802, 'Produto não existe ou não disponível em nenhuma máquina próxima.');
+
+    WHEN OTHERS THEN
+        IF SQLCODE = -20814 THEN
+            -- Repassa a exceção original sem alterar a mensagem
+            RAISE;
+        ELSE
+            -- Qualquer outro erro inesperado
+            RAISE_APPLICATION_ERROR(-20802, 'Erro inesperado: ' || SQLERRM);
+        END IF;
+END;
+
+
+
+
+/*******************************************************************************
+******************************* TESTES *****************************************
+*******************************************************************************/
+
+-- TESTE 1 
+-- Testar qual a máquina mais próxima com o produto 9901 (ex: Batatas Lays Originais)
+-- A partir de coordenadas próximas ao centro de Coimbra
+SELECT maquina_mais_proxima(9901, 40.210, -8.410) AS id_maq_proxima FROM dual;
+
+-- TESTE 2 
+-- Produto com ID inexistente
+-- Deve lançar: ORA-20802: Produto não existe ou não disponível...
+SELECT maquina_mais_proxima(9999, 40.210, -8.410) AS id_maq_proxima FROM dual;
+
+-- TESTE 3 
+-- Parte A: Reduz artificialmente o stock a zero para testar
+UPDATE Configuracao_Compartimento
+SET STOCK_ATUAL = 0
+WHERE ID_PRODUTO = 9901;
+COMMIT;
+
+-- Parte B: Agora não deve encontrar nenhuma máquina com esse produto
+-- Deve lançar: ORA-20802: Produto não existe ou não disponível...
+SELECT maquina_mais_proxima(9901, 40.210, -8.410) AS id_maq_proxima FROM dual;
+
+-- Parte C: Repor o stock original para futuros testes
+UPDATE Configuracao_Compartimento
+SET STOCK_ATUAL = 10
+WHERE ID_PRODUTO = 9901;
+COMMIT;
+
+-- TESTE 4 
+-- Coordenadas NULL
+-- Deve lançar: ORA-20814: Coordenadas inválidas
+SELECT maquina_mais_proxima(9901, NULL, -8.410) AS id_maq_proxima FROM dual;
+
+
+-- TESTE 5 
+-- Latitude fora dos limites reais (ex: 100)
+-- Deve lançar: ORA-20814: Coordenadas inválidas
+SELECT maquina_mais_proxima(9901, 100, -8.410) AS id_maq_proxima FROM dual;
+
+
+-- TESTE 6 
+-- Longitude fora dos limites reais (ex: -200)
+-- Deve lançar: ORA-20814: Coordenadas inválidas
+SELECT maquina_mais_proxima(9901, 40.210, -200) AS id_maq_proxima FROM dual;
+
+
+
+
+
+
+
+-- =======================================================================================
+-- ======================================= Alínea H) =====================================
+-- =======================================================================================
+CREATE function distancia(LAT1  NUMBER,LON1  NUMBER,LAT2  NUMBER,LON2  NUMBER) 
+RETURN NUMBER
+IS
+    R NUMBER := 6371; -- Raio da Terra em Kms
+    PI CONSTANT NUMBER := 3.141592653589793;
+    D_LAT NUMBER ;
+    D_LON NUMBER ;
+    A NUMBER ;
+    D NUMBER ;
+BEGIN
+    D_LAT := (LAT2 - LAT1) * PI / 180;
+    D_LON := (LON2 - LON1) * PI / 180;
+    A := SIN(D_LAT/2) * SIN(D_LAT/2) + COS(LAT1*PI/180) * COS(LAT2*PI/180) * SIN(D_LON/2) * SIN(D_LON/2);
+    D := R * (2 * ATAN2(SQRT(A), SQRT(1 - A)));
+    RETURN ROUND(D,3);
+END;        
+/     
+
+
+--Crie a função prox_maquina_sem_produto, 
+--que recebe a referência de um produto e o 
+--código de uma máquina, e retorna o código da
+--máquina mais próxima que não tem esse produto 
+--disponível para venda. A função deve retornar as seguintes exceções: -20802
+
+
+
+CREATE OR REPLACE FUNCTION prox_maquina_sem_produto(idproduto NUMBER,idmaquina NUMBER
+    
+) RETURN NUMBER
+
+IS
+    latitude_maquina                    maquina.latitude%TYPE;
+    longitude_maquina                   maquina.longitude%TYPE;
+    
+    id_maq_mais_prox                    maquina.id_maquina%TYPE;
+    existem_maquina_sem_produto         NUMBER;
+    
+    produto_existe                      NUMBER;
+    maquina_existe                      NUMBER;
+BEGIN
+    -- Verificar se o ID do produto é válido (> 0 e existe)
+    IF idproduto <= 0 THEN
+        RAISE_APPLICATION_ERROR(-20802, 'ID do produto inválido.');
+    END IF;
+
+    SELECT COUNT(*) INTO produto_existe
+    FROM produto
+    WHERE id_produto = idproduto;
+
+    IF produto_existe = 0 THEN
+        RAISE_APPLICATION_ERROR(-20802, 'Produto não existe.');
+    END IF;
+
+    -- Verificar se a máquina de referência existe
+    SELECT COUNT(*) INTO maquina_existe
+    FROM maquina
+    WHERE id_maquina = idmaquina;
+
+    IF maquina_existe = 0 THEN
+        RAISE_APPLICATION_ERROR(-20804, 'Máquina de referência não existe.');
+    END IF;
+
+    -- Obter coordenadas da máquina de referência
+    SELECT latitude, longitude
+    INTO latitude_maquina, longitude_maquina
+    FROM maquina
+    WHERE id_maquina = idmaquina;
+
+    -- Verificar se existe pelo menos uma máquina sem o produto disponível
+    SELECT COUNT(*)
+    INTO existem_maquina_sem_produto
+    FROM maquina m
+    WHERE m.id_maquina != idmaquina
+      AND NOT EXISTS (
+            SELECT 1
+            FROM configuracao_compartimento c
+            JOIN compartimento cp ON c.id_compartimento = cp.id_compartimento
+            WHERE cp.id_maquina = m.id_maquina
+              AND c.id_produto = idproduto
+              AND c.stock_atual > 0
+      );
+
+    IF existem_maquina_sem_produto = 0 THEN
+        RAISE_APPLICATION_ERROR(-20802, 'Todas as máquinas têm o produto disponível.');
+    END IF;
+
+    -- Selecionar a máquina mais próxima sem o produto
+    SELECT id_maquina
+    INTO id_maq_mais_prox
+    FROM (
+        SELECT m.id_maquina
+        FROM maquina m
+        WHERE m.id_maquina != idmaquina
+          AND NOT EXISTS (
+                SELECT 1
+                FROM configuracao_compartimento c
+                JOIN compartimento cp ON c.id_compartimento = cp.id_compartimento
+                WHERE cp.id_maquina = m.id_maquina
+                  AND c.id_produto = idproduto
+                  AND c.stock_atual > 0
+          )
+        ORDER BY distancia(latitude_maquina, longitude_maquina, m.latitude, m.longitude)
+    )
+    WHERE ROWNUM = 1;
+
+    RETURN id_maq_mais_prox;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20803, 'Não foi encontrada nenhuma máquina.');
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20099, 'Erro inesperado: ' || SQLERRM);
+END;
+/
+
+
+-- Exemplo válido
+SELECT prox_maquina_sem_produto(9901, 1) FROM dual;
+
+-- Produto inválido (não existe)
+SELECT prox_maquina_sem_produto(-55, 1) FROM dual;
+
+
+-- Máquina inexistente
+SELECT prox_maquina_sem_produto(9901, 9999) FROM dual;
+
+--produto n existe
+SELECT prox_maquina_sem_produto(50, 1) FROM dual;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- =======================================================================================
+-- ======================================= Alínea O) =====================================
+-- =======================================================================================
+-- ============================================
+-- Função: DISTANCIA_LINEAR
+-- Objetivo: Calcular a distância linear (em km) entre dois pontos geográficos
+-- Parâmetros:
+--   - lat1, long1: coordenadas do primeiro ponto
+--   - lat2, long2: coordenadas do segundo ponto
+-- Retorna:
+--   - Distância em quilómetros (com 3 casas decimais)
+-- Exceções:
+--   - -20821: coordenadas inválidas (valores nulos não permitidos)
+--   - -20823: latitude fora do intervalo válido [-90, 90]
+--   - -20824: longitude fora do intervalo válido [-180, 180]
+-- ============================================
+
+CREATE OR REPLACE FUNCTION distancia(
+    LAT1 NUMBER,
+    LON1 NUMBER,
+    LAT2 NUMBER,
+    LON2 NUMBER
+) RETURN NUMBER
+IS
+    R NUMBER := 6371; -- Raio da Terra em Kms
+    PI CONSTANT NUMBER := 3.141592653589793;
+    D_LAT NUMBER;
+    D_LON NUMBER;
+    A NUMBER;
+    D NUMBER;
+BEGIN
+    -- Verificar parâmetros nulos
+    IF LAT1 IS NULL OR LON1 IS NULL OR LAT2 IS NULL OR LON2 IS NULL THEN
+        RAISE_APPLICATION_ERROR(-20821, 'Coordenadas inválidas: valores nulos não são permitidos.');
+    END IF;
+
+    -- Validar limites da latitude
+    IF LAT1 < -90 OR LAT1 > 90 OR LAT2 < -90 OR LAT2 > 90 THEN
+        RAISE_APPLICATION_ERROR(-20823, 'Latitude fora do intervalo válido [-90, 90].');
+    END IF;
+
+    -- Validar limites da longitude
+    IF LON1 < -180 OR LON1 > 180 OR LON2 < -180 OR LON2 > 180 THEN
+        RAISE_APPLICATION_ERROR(-20824, 'Longitude fora do intervalo válido [-180, 180].');
+    END IF;
+
+    -- Cálculo da distância (Haversine)
+    D_LAT := (LAT2 - LAT1) * PI / 180;
+    D_LON := (LON2 - LON1) * PI / 180;
+
+    A := SIN(D_LAT/2) * SIN(D_LAT/2) +
+         COS(LAT1*PI/180) * COS(LAT2*PI/180) * SIN(D_LON/2) * SIN(D_LON/2);
+
+    D := R * (2 * ATAN2(SQRT(A), SQRT(1 - A)));
+
+    RETURN ROUND(D, 3);
+
+END;
+/
+
+
+
+
+
+
+
+/*******************************************************************************
+******************************* TESTES *****************************************
+*******************************************************************************/
+-- TESTE 1 – Distância válida entre dois pontos (deve funcionar)
+SET SERVEROUTPUT ON;
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Teste 1 - Distância válida:');
+    DECLARE
+        v_dist NUMBER;
+    BEGIN
+        v_dist := distancia(40.211, -8.429, 40.203, -8.410);
+        DBMS_OUTPUT.PUT_LINE('Distância calculada: ' || v_dist || ' km');
+    END;
+END;
+/
+
+-- TESTE 2 – Coordenada nula (espera exceção -20821)
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Teste 2 - Coordenada nula (espera erro):');
+    DECLARE
+        v_dist NUMBER;
+    BEGIN
+        v_dist := distancia(NULL, -8.429, 40.203, -8.410);
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Erro capturado: ' || SQLERRM);
+    END;
+END;
+/
+
+-- TESTE 3 – Latitude fora do intervalo (espera exceção -20823)
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Teste 3 - Latitude fora do intervalo (espera erro):');
+    DECLARE
+        v_dist NUMBER;
+    BEGIN
+        v_dist := distancia(100, -8.429, 40.203, -8.410);
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Erro capturado: ' || SQLERRM);
+    END;
+END;
+/
+
+-- TESTE 4 – Longitude fora do intervalo (espera exceção -20824)
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Teste 4 - Longitude fora do intervalo (espera erro):');
+    DECLARE
+        v_dist NUMBER;
+    BEGIN
+        v_dist := distancia(40.211, -190, 40.203, -8.410);
+    EXCEPTION
+        WHEN OTHERS THEN
+            DBMS_OUTPUT.PUT_LINE('Erro capturado: ' || SQLERRM);
+    END;
+END;
+/
+
+-- TESTE 5 – Pontos iguais (espera distância 0)
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('Teste 5 - Pontos iguais (distância deve ser 0):');
+    DECLARE
+        v_dist NUMBER;
+    BEGIN
+        v_dist := distancia(40.0, -8.0, 40.0, -8.0);
+        DBMS_OUTPUT.PUT_LINE('Distância calculada: ' || v_dist || ' km');
+    END;
+END;
+/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- =======================================================================================
+-- ================================= Função Ana Pessoa ===================================
+-- ================================= P_FUNC_2023112690 ===================================
+-- =======================================================================================
+-- ============================================
+-- Função: P_FUNC_2023112690
+--
+-- Descrição:
+--   Calcula o tempo médio (em minutos) das visitas a uma máquina,
+--   com base nas paragens registadas em viagens.
+--
+-- Parâmetros:
+--   - idmaquina: Identificador da máquina.
+--
+-- Retorno:
+--   - Tempo médio de duração das visitas em minutos.
+--
+-- Exceções:
+--   - -20801: Máquina inexistente.
+--   - -20808: Máquina ainda não teve visitas registadas.
+--   - -20999: Erro inesperado.
+-- ============================================
+
+CREATE OR REPLACE FUNCTION P_FUNC_2023112690 (
+    idmaquina IN NUMBER
+) RETURN NUMBER
+IS
+    v_tempo_medio NUMBER;
+BEGIN
+    -- Verificar se a máquina existe
+    DECLARE
+        v_dummy NUMBER;
+    BEGIN
+        SELECT 1 INTO v_dummy
+        FROM Maquina
+        WHERE ID_MAQUINA = idmaquina;
+    EXCEPTION
+        WHEN NO_DATA_FOUND THEN
+            RAISE_APPLICATION_ERROR(-20801, 'Máquina inexistente.');
+    END;
+
+    -- Calcular tempo médio das visitas
+    SELECT ROUND(AVG((CAST(DATA_HORA_SAIDA AS DATE) - CAST(DATA_HORA_CHEGADA AS DATE)) * 24 * 60), 1)
+    INTO v_tempo_medio
+    FROM Paragem
+    WHERE ID_MAQUINA = idmaquina
+      AND DATA_HORA_CHEGADA IS NOT NULL
+      AND DATA_HORA_SAIDA IS NOT NULL;
+
+    -- Verificar se existem visitas
+    IF v_tempo_medio IS NULL THEN
+        RAISE_APPLICATION_ERROR(-20808, 'Sem visitas registadas para esta máquina.');
+    END IF;
+
+    RETURN v_tempo_medio;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20999, 'Erro inesperado ao calcular tempo médio de visita: ' || SQLERRM);
+END;
+/
+
+
+/*******************************************************************************
+******************************* TESTES *****************************************
+*******************************************************************************/
+
+-- TESTE 1 – Máquina com visitas registadas
+-- Espera-se um valor numérico > 0 com 1 casa decimal (ex: 35.2)
+SELECT distancia_linear(40.211, -8.429, 40.203, -8.410) AS distancia_km
+FROM dual;
+
+
+
+-- TESTE 2 – Máquina válida mas sem visitas
+-- Espera-se erro: -20808
+SELECT P_FUNC_2023112690(1004) AS tempo_medio_minutos
+FROM dual;
+
+
+
+
+-- TESTE 3 –  Máquina inexistente
+-- Espera-se erro: -20801
+SELECT P_FUNC_2023112690(9999) AS tempo_medio_minutos
+FROM dual;
+
+
+
+
+
+
+
+
+-- =======================================================================================
+-- =============================== Função Manuel Furtado =================================
+-- ================================= P_FUNC_2023154006 ===================================
+-- =======================================================================================
+
+Create or Replace Function calc_percentagem_ocupacao(idMaquina Maquina.ID_Maquina%TYPE) 
+Return NUMBER
+IS
+v_Maquina_Count         NUMBER;
+v_stock_total_Maquina   NUMBER := 0;
+v_capacidade_total_maq  NUMBER := 0;
+v_percentagem_ocupacao  NUMBER;
+Begin
+Select Count(*)Into v_Maquina_Count
+From Maquina
+Where ID_Maquina = idMaquina;
+IF v_Maquina_Count = 0 THEN
+Raise_application_error(-20801, 'Código de máquina inexistente: ' || idMaquina);
+END IF;
+Select Sum(cc.Stock_Atual), Sum(cc.Capacidade_Produto) Into v_stock_total_Maquina, v_capacidade_total_maq
+From Maquina m
+Join Compartimento comp on m.ID_Maquina = comp.ID_Maquina
+Join configuracao_compartimento cc on comp.ID_COMPARTIMENTO = cc.ID_COMPARTIMENTO
+Where
+m.ID_Maquina = idMaquina
+and cc.Data_Fim_Configuracao IS NULL; 
+IF v_capacidade_total_maq = 0 THEN
+Return NULL;
+END IF;
+v_percentagem_ocupacao := (v_stock_total_Maquina / v_capacidade_total_maq) * 100;
+Return Round(v_percentagem_ocupacao,2);
+Exception
+When OTHERS THEN
+Raise;
+END;
+/
+
+
+
+- TESTE 1: Máquina válida com stock e capacidade positivas
+-- Suponha: Na Configuracao_Compartimento para ID_Maquina = 1, 
+--          SUM(Stock_Atual) = 50 e SUM(Capacidade_Produto) = 100.
+-- Resultado esperado: (50/100)*100 = 50.00
+SELECT calc_percentagem_ocupacao(1) AS pct_ocupacao
+FROM dual;
+
+-- TESTE 2: Máquina inexistente (não há registo com ID_Maquina = 9999)
+-- Esperado: ORA-20801: Código de máquina inexistente: 9999
+SELECT calc_percentagem_ocupacao(9999) AS pct_ocupacao
+FROM dual;
+
+-- TESTE 3: Máquina válida mas sem Configuracao_Compartimento ativa
+-- Suponha: ID_Maquina = 2 existe, mas não há registos em Configuracao_Compartimento
+--          com Data_Fim_Configuracao IS NULL para essa máquina.
+--          Logo, SUM(Capacidade_Produto) = NULL ? 0. A função deve devolver NULL.
+SELECT calc_percentagem_ocupacao(2) AS pct_ocupacao
+FROM dual;
+
+
+
+
+
+
+
+
+-- =======================================================================================
+-- ============================== Função Margarida Campos ================================
+-- ================================= P_FUNC_2022137822 ===================================
+-- =======================================================================================
+--calcule o número de dias restantes até que 
+--um produto numa máquina específica atinja o nível mínimo permitido. 
+
+--estima a data em que será necessário o próximo reabastecimento. 
+
+--idmaquina: Identificador da máquina a ser analisada.
+--idproduto: Identificador do produto a ser analisado.
+--dias_analise: Número de dias considerados para cálculo da média de vendas.
+
+CREATE OR REPLACE FUNCTION previsao_reabastecimento(
+    idmaquina     IN NUMBER,
+    idproduto     IN NUMBER,
+    dias_analise  IN NUMBER
+) RETURN NUMBER
+IS
+    stock_atual     NUMBER;
+    qtd_minima      NUMBER;
+    media_dia       NUMBER;
+    dias_restantes  NUMBER;
+    maquina_existe    NUMBER;
+    produto_existe    NUMBER;
+BEGIN
+    -- Validar dias_analise
+    IF dias_analise <= 0 THEN
+        RAISE_APPLICATION_ERROR(-20901, 'Número de dias de análise inválido.');
+    END IF;
+
+    -- máquina existe
+    SELECT COUNT(*) INTO maquina_existe
+    FROM maquina
+    WHERE id_maquina = idmaquina;
+
+    IF maquina_existe = 0 THEN
+        RAISE_APPLICATION_ERROR(-20902, 'Máquina não existe.');
+    END IF;
+
+    -- existe produto
+    SELECT COUNT(*) INTO produto_existe
+    FROM produto
+    WHERE id_produto = idproduto;
+
+    IF produto_existe = 0 THEN
+        RAISE_APPLICATION_ERROR(-20903, 'Produto não existe.');
+    END IF;
+
+    -- Obter stock atual e quantidade mínima
+    SELECT SUM(c.stock_atual),SUM(c.qtd_minima) INTO stock_atual, qtd_minima
+    FROM configuracao_compartimento c
+    JOIN compartimento cp ON c.id_compartimento = cp.id_compartimento
+    WHERE cp.id_maquina = idmaquina
+      AND c.id_produto = idproduto;
+
+    -- Obter média diária de vendas
+    SELECT NVL(COUNT(*) / dias_analise, 0) INTO media_dia
+    FROM venda
+    WHERE id_maquina = idmaquina
+      AND id_produto = idproduto
+      AND data_venda >= SYSDATE - dias_analise;
+
+    -- Se stock já está abaixo ou igual ao mínimo, retorna 0
+    IF stock_atual <= qtd_minima THEN
+        RETURN 0;
+    END IF;
+
+    -- Se não há consumo, não há previsão
+    IF media_dia = 0 THEN
+        RETURN NULL;
+    END IF;
+
+    -- Calcular previsão de dias restantes sem arredondar
+    dias_restantes := (stock_atual - qtd_minima) / media_dia;
+
+    RETURN dias_restantes;
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN NULL;
+    WHEN OTHERS THEN
+        RAISE_APPLICATION_ERROR(-20999, 'Erro inesperado: ' || SQLERRM);
+END;
+/
+
+
+
+----testes-------------
+
+
+--Verificar vendas nos últimos dias para máquina e produto
+SELECT COUNT(*) AS total_vendas
+FROM venda
+WHERE id_maquina = 1       
+  AND id_produto = 9901      
+  AND data_venda >= SYSDATE - 7;  -- vendas nos últimos 7 dias
+
+
+--Verificar stock atual e quantidade mínima para máquina e produto
+SELECT SUM(c.stock_atual) AS stock_atual, SUM(c.qtd_minima) AS qtd_minima
+FROM configuracao_compartimento c
+JOIN compartimento cp ON c.id_compartimento = cp.id_compartimento
+WHERE cp.id_maquina = 1      
+  AND c.id_produto = 9901;   
+
+
+-- Executar a função e obter dias restantes de stock
+SELECT previsao_reabastecimento(1, 9901, 7) AS dias_restantes FROM dual;
+
+
+
+
+
+
+
