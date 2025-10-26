@@ -1,6 +1,6 @@
 
 -- =============================================================================
--- Secção 2: Criação da Estrutura (Tabelas, Função, Índice, Sequências)
+-- SecÃ§Ã£o 2: CriaÃ§Ã£o da Estrutura (Tabelas, FunÃ§Ã£o, Ãndice, SequÃªncias)
 -- =============================================================================
 
 CREATE TABLE Armazem (
@@ -12,8 +12,8 @@ CREATE TABLE Armazem (
     LONGITUDE NUMBER(10,6),
     CONSTRAINT pk_armazem PRIMARY KEY (ID_ARMAZEM)
 );
-COMMENT ON TABLE Armazem IS 'Armazéns onde os produtos ficam estocados.';
-COMMENT ON COLUMN Armazem.ID_ARMAZEM IS 'Identificador único do armazém.';
+COMMENT ON TABLE Armazem IS 'ArmazÃ©ns onde os produtos ficam estocados.';
+COMMENT ON COLUMN Armazem.ID_ARMAZEM IS 'Identificador Ãºnico do armazÃ©m.';
 
 CREATE TABLE Veiculo (
     MATRICULA VARCHAR2(10 BYTE) NOT NULL,
@@ -25,10 +25,10 @@ CREATE TABLE Veiculo (
     ID_ARMAZEM_BASE NUMBER(8,0),
     CONSTRAINT pk_veiculo PRIMARY KEY (MATRICULA),
     CONSTRAINT fk_veiculo_armazem FOREIGN KEY (ID_ARMAZEM_BASE) REFERENCES Armazem(ID_ARMAZEM),
-    CONSTRAINT chk_veiculo_estado CHECK (ESTADO_VEICULO IN ('Disponível', 'Em Viagem', 'Manutenção', 'Indisponível'))
+    CONSTRAINT chk_veiculo_estado CHECK (ESTADO_VEICULO IN ('DisponÃ­vel', 'Em Viagem', 'ManutenÃ§Ã£o', 'IndisponÃ­vel'))
 );
-COMMENT ON TABLE Veiculo IS 'Veículos utilizados nas viagens de abastecimento.';
-COMMENT ON COLUMN Veiculo.AUTONOMIA_MAX_KM IS 'Autonomia máxima em KMs (default 300).';
+COMMENT ON TABLE Veiculo IS 'VeÃ­culos utilizados nas viagens de abastecimento.';
+COMMENT ON COLUMN Veiculo.AUTONOMIA_MAX_KM IS 'Autonomia mÃ¡xima em KMs (default 300).';
 
 CREATE TABLE Funcionario (
     ID_FUNCIONARIO NUMBER(8,0) NOT NULL,
@@ -38,14 +38,14 @@ CREATE TABLE Funcionario (
     CONSTRAINT pk_funcionario PRIMARY KEY (ID_FUNCIONARIO),
     CONSTRAINT chk_funcionario_estado CHECK (ESTADO IN ('Ativo', 'Inativo'))
 );
-COMMENT ON TABLE Funcionario IS 'Funcionários que realizam as viagens ou manutenções.';
+COMMENT ON TABLE Funcionario IS 'FuncionÃ¡rios que realizam as viagens ou manutenÃ§Ãµes.';
 
 CREATE TABLE Estado_Maquina (
     ID_ESTADO NUMBER(8,0) NOT NULL,
     DESCRICAO VARCHAR2(50 BYTE) UNIQUE,
     CONSTRAINT pk_estado_maquina PRIMARY KEY (ID_ESTADO)
 );
-COMMENT ON TABLE Estado_Maquina IS 'Tabela de domínio para os possíveis estados de uma máquina.';
+COMMENT ON TABLE Estado_Maquina IS 'Tabela de domÃ­nio para os possÃ­veis estados de uma mÃ¡quina.';
 
 CREATE TABLE Maquina (
     ID_MAQUINA NUMBER(10,0) NOT NULL,
@@ -59,8 +59,8 @@ CREATE TABLE Maquina (
     CONSTRAINT pk_maquina PRIMARY KEY (ID_MAQUINA),
     CONSTRAINT fk_maquina_estado FOREIGN KEY (ID_ESTADO_ATUAL) REFERENCES Estado_Maquina(ID_ESTADO)
 );
-COMMENT ON TABLE Maquina IS 'Máquinas de venda automática.';
-COMMENT ON COLUMN Maquina.ULTIMA_ATUALIZACAO_STATUS IS 'Timestamp da última comunicação recebida da máquina (ping ou alteração de estado). Essencial para detetar estado Offline.';
+COMMENT ON TABLE Maquina IS 'MÃ¡quinas de venda automÃ¡tica.';
+COMMENT ON COLUMN Maquina.ULTIMA_ATUALIZACAO_STATUS IS 'Timestamp da Ãºltima comunicaÃ§Ã£o recebida da mÃ¡quina (ping ou alteraÃ§Ã£o de estado). Essencial para detetar estado Offline.';
 
 CREATE TABLE Compartimento (
     ID_COMPARTIMENTO NUMBER(8,0) NOT NULL,
@@ -69,8 +69,8 @@ CREATE TABLE Compartimento (
     CONSTRAINT pk_compartimento PRIMARY KEY (ID_COMPARTIMENTO),
     CONSTRAINT fk_comp_maquina FOREIGN KEY (ID_MAQUINA) REFERENCES Maquina(ID_MAQUINA) ON DELETE CASCADE
 );
-COMMENT ON TABLE Compartimento IS 'Compartimentos físicos dentro de cada máquina.';
-COMMENT ON COLUMN Compartimento.POSICAO_NA_MAQUINA IS 'Código ou descrição da posição (ex: A1, B3).';
+COMMENT ON TABLE Compartimento IS 'Compartimentos fÃ­sicos dentro de cada mÃ¡quina.';
+COMMENT ON COLUMN Compartimento.POSICAO_NA_MAQUINA IS 'CÃ³digo ou descriÃ§Ã£o da posiÃ§Ã£o (ex: A1, B3).';
 
 CREATE TABLE Produto (
     ID_PRODUTO NUMBER(8,0) NOT NULL,
@@ -79,7 +79,7 @@ CREATE TABLE Produto (
     DESCRICAO VARCHAR2(255 BYTE),
     CONSTRAINT pk_produto PRIMARY KEY (ID_PRODUTO)
 );
-COMMENT ON TABLE Produto IS 'Produtos disponíveis para venda nas máquinas.';
+COMMENT ON TABLE Produto IS 'Produtos disponÃ­veis para venda nas mÃ¡quinas.';
 
 CREATE OR REPLACE FUNCTION get_maquina_id_func (p_id_compartimento IN NUMBER)
   RETURN NUMBER DETERMINISTIC
@@ -95,7 +95,7 @@ BEGIN
   RETURN v_id_maquina;
 EXCEPTION
   WHEN NO_DATA_FOUND THEN
-    RAISE_APPLICATION_ERROR(-20001, 'Função get_maquina_id_func: Compartimento inexistente ID=' || p_id_compartimento);
+    RAISE_APPLICATION_ERROR(-20001, 'FunÃ§Ã£o get_maquina_id_func: Compartimento inexistente ID=' || p_id_compartimento);
 END;
 /
 
@@ -115,15 +115,15 @@ CREATE TABLE Configuracao_Compartimento (
     CONSTRAINT fk_confcomp_prod FOREIGN KEY (ID_PRODUTO) REFERENCES Produto(ID_PRODUTO),
     CONSTRAINT chk_confcomp_stock CHECK (STOCK_ATUAL >= 0 AND STOCK_ATUAL <= CAPACIDADE_PRODUTO)
 );
-COMMENT ON TABLE Configuracao_Compartimento IS 'Configuração de qual produto está em qual compartimento, a que preço, capacidade e stock.';
-COMMENT ON COLUMN Configuracao_Compartimento.CODIGO_CLIENTE IS 'Código que o cliente digita na máquina para selecionar o produto neste compartimento.';
-COMMENT ON COLUMN Configuracao_Compartimento.QTD_MINIMA IS 'Quantidade mínima desejada para este produto neste compartimento (para alertas de reposição).';
+COMMENT ON TABLE Configuracao_Compartimento IS 'ConfiguraÃ§Ã£o de qual produto estÃ¡ em qual compartimento, a que preÃ§o, capacidade e stock.';
+COMMENT ON COLUMN Configuracao_Compartimento.CODIGO_CLIENTE IS 'CÃ³digo que o cliente digita na mÃ¡quina para selecionar o produto neste compartimento.';
+COMMENT ON COLUMN Configuracao_Compartimento.QTD_MINIMA IS 'Quantidade mÃ­nima desejada para este produto neste compartimento (para alertas de reposiÃ§Ã£o).';
 COMMENT ON COLUMN Configuracao_Compartimento.STOCK_ATUAL IS 'Quantidade atual do produto neste compartimento.';
-COMMENT ON COLUMN Configuracao_Compartimento.DATA_FIM_CONFIGURACAO IS 'Data em que esta configuração deixou de ser ativa (para histórico - Q12). NULL significa ativa.';
+COMMENT ON COLUMN Configuracao_Compartimento.DATA_FIM_CONFIGURACAO IS 'Data em que esta configuraÃ§Ã£o deixou de ser ativa (para histÃ³rico - Q12). NULL significa ativa.';
 
 CREATE UNIQUE INDEX uk_confcomp_maq_codcliente_fbi
   ON Configuracao_Compartimento (get_maquina_id_func(ID_COMPARTIMENTO), CODIGO_CLIENTE);
--- Garante que um CODIGO_CLIENTE (tecla digitada) é único por máquina.
+-- Garante que um CODIGO_CLIENTE (tecla digitada) Ã© Ãºnico por mÃ¡quina.
 
 CREATE TABLE Rota (
     ID_ROTA NUMBER(8,0) NOT NULL,
@@ -136,8 +136,8 @@ CREATE TABLE Rota (
     CONSTRAINT fk_rota_armazem FOREIGN KEY (ID_ARMAZEM_ORIGEM) REFERENCES Armazem(ID_ARMAZEM),
     CONSTRAINT chk_rota_ativo CHECK (ATIVO IN ('S', 'N'))
 );
-COMMENT ON TABLE Rota IS 'Rotas pré-definidas para as viagens de abastecimento.';
-COMMENT ON COLUMN Rota.DISTANCIA_TOTAL_KM IS 'Distância total estimada da rota (para Q22). Precisa ser calculada externamente ou por função.';
+COMMENT ON TABLE Rota IS 'Rotas prÃ©-definidas para as viagens de abastecimento.';
+COMMENT ON COLUMN Rota.DISTANCIA_TOTAL_KM IS 'DistÃ¢ncia total estimada da rota (para Q22). Precisa ser calculada externamente ou por funÃ§Ã£o.';
 
 CREATE TABLE Detalhe_Rota (
     ID_ROTA NUMBER(8,0) NOT NULL,
@@ -148,7 +148,7 @@ CREATE TABLE Detalhe_Rota (
     CONSTRAINT fk_detrota_maq FOREIGN KEY (ID_MAQUINA) REFERENCES Maquina(ID_MAQUINA),
     CONSTRAINT uk_detrota_maq UNIQUE (ID_ROTA, ID_MAQUINA)
 );
-COMMENT ON TABLE Detalhe_Rota IS 'Define a sequência de máquinas para cada rota pré-definida.';
+COMMENT ON TABLE Detalhe_Rota IS 'Define a sequÃªncia de mÃ¡quinas para cada rota prÃ©-definida.';
 
 CREATE TABLE Viagem (
     ID_VIAGEM NUMBER(15,0) NOT NULL,
@@ -168,9 +168,9 @@ CREATE TABLE Viagem (
     CONSTRAINT fk_viagem_arm_fim FOREIGN KEY (ID_ARMAZEM_FIM) REFERENCES Armazem(ID_ARMAZEM),
     CONSTRAINT fk_viagem_rota FOREIGN KEY (ID_ROTA) REFERENCES Rota(ID_ROTA)
 );
-COMMENT ON TABLE Viagem IS 'Registo de cada viagem de abastecimento/manutenção realizada.';
-COMMENT ON COLUMN Viagem.ID_ROTA IS 'Referência opcional à rota pré-definida seguida (para Q27).';
-COMMENT ON COLUMN Viagem.DISTANCIA_TOTAL_KM IS 'Distância real percorrida na viagem (pode ser calculada no fim ou via GPS).';
+COMMENT ON TABLE Viagem IS 'Registo de cada viagem de abastecimento/manutenÃ§Ã£o realizada.';
+COMMENT ON COLUMN Viagem.ID_ROTA IS 'ReferÃªncia opcional Ã  rota prÃ©-definida seguida (para Q27).';
+COMMENT ON COLUMN Viagem.DISTANCIA_TOTAL_KM IS 'DistÃ¢ncia real percorrida na viagem (pode ser calculada no fim ou via GPS).';
 
 CREATE TABLE Paragem (
     ID_PARAGEM NUMBER(15,0) NOT NULL,
@@ -186,9 +186,9 @@ CREATE TABLE Paragem (
     CONSTRAINT fk_paragem_maq FOREIGN KEY (ID_MAQUINA) REFERENCES Maquina(ID_MAQUINA),
     CONSTRAINT uk_paragem_viag_ordem UNIQUE (ID_VIAGEM, ORDEM_VISITA)
 );
-COMMENT ON TABLE Paragem IS 'Registo de cada paragem efetuada numa máquina durante uma viagem.';
-COMMENT ON COLUMN Paragem.TIPO_VISITA IS 'Indica o propósito principal da paragem (Abastecimento, Manutencao, etc.).';
-COMMENT ON COLUMN Paragem.DISTANCIA_PERCORRIDA_KM IS 'Distância percorrida desde a última paragem ou origem (para Q34). Precisa ser calculada/registada.';
+COMMENT ON TABLE Paragem IS 'Registo de cada paragem efetuada numa mÃ¡quina durante uma viagem.';
+COMMENT ON COLUMN Paragem.TIPO_VISITA IS 'Indica o propÃ³sito principal da paragem (Abastecimento, Manutencao, etc.).';
+COMMENT ON COLUMN Paragem.DISTANCIA_PERCORRIDA_KM IS 'DistÃ¢ncia percorrida desde a Ãºltima paragem ou origem (para Q34). Precisa ser calculada/registada.';
 
 CREATE TABLE Abastecimento_Detalhe (
     ID_ABASTECIMENTO NUMBER(15,0) NOT NULL,
@@ -205,35 +205,35 @@ CREATE TABLE Abastecimento_Detalhe (
     CONSTRAINT chk_abast_qtd CHECK (QUANTIDADE_ABASTECIDA >= 0)
 );
 COMMENT ON TABLE Abastecimento_Detalhe IS 'Detalhe dos produtos abastecidos numa paragem.';
-COMMENT ON COLUMN Abastecimento_Detalhe.ID_COMPARTIMENTO IS 'Identifica o compartimento específico que foi abastecido (para Q35).';
-COMMENT ON COLUMN Abastecimento_Detalhe.STOCK_ANTES_ABAST IS 'Stock registado no início da intervenção no compartimento.';
-COMMENT ON COLUMN Abastecimento_Detalhe.STOCK_DEPOIS_ABAST IS 'Stock registado no fim da intervenção no compartimento.';
+COMMENT ON COLUMN Abastecimento_Detalhe.ID_COMPARTIMENTO IS 'Identifica o compartimento especÃ­fico que foi abastecido (para Q35).';
+COMMENT ON COLUMN Abastecimento_Detalhe.STOCK_ANTES_ABAST IS 'Stock registado no inÃ­cio da intervenÃ§Ã£o no compartimento.';
+COMMENT ON COLUMN Abastecimento_Detalhe.STOCK_DEPOIS_ABAST IS 'Stock registado no fim da intervenÃ§Ã£o no compartimento.';
 
 CREATE TABLE Encomenda (
     ID_ENCOMENDA NUMBER(15,0) NOT NULL,
     ID_ARMAZEM NUMBER(8,0) NOT NULL,
     DATA_ENCOMENDA DATE DEFAULT SYSDATE,
     DATA_PREV_ENTREGA DATE,
-    DATA_ENTREGA_REAL DATE, -- [SUGESTÃO]
+    DATA_ENTREGA_REAL DATE, -- [SUGESTÃƒO]
     ESTADO_ENCOMENDA VARCHAR2(20 BYTE),
     CONSTRAINT pk_encomenda_aabd PRIMARY KEY (ID_ENCOMENDA),
     CONSTRAINT fk_enc_arm_aabd FOREIGN KEY (ID_ARMAZEM) REFERENCES Armazem(ID_ARMAZEM)
 );
-COMMENT ON TABLE Encomenda IS 'Encomendas de produtos feitas aos fornecedores para um armazém.';
-COMMENT ON COLUMN Encomenda.DATA_ENTREGA_REAL IS '[SUGESTÃO] Data em que a encomenda foi efetivamente recebida no armazém.';
+COMMENT ON TABLE Encomenda IS 'Encomendas de produtos feitas aos fornecedores para um armazÃ©m.';
+COMMENT ON COLUMN Encomenda.DATA_ENTREGA_REAL IS '[SUGESTÃƒO] Data em que a encomenda foi efetivamente recebida no armazÃ©m.';
 
 CREATE TABLE Detalhe_Encomenda (
     ID_ENCOMENDA NUMBER(15,0) NOT NULL,
     ID_PRODUTO NUMBER(8,0) NOT NULL,
     QUANTIDADE_ENCOMENDADA NUMBER(6,0) NOT NULL,
-    QUANTIDADE_RECEBIDA NUMBER(6,0) DEFAULT 0, -- [SUGESTÃO]
+    QUANTIDADE_RECEBIDA NUMBER(6,0) DEFAULT 0, -- [SUGESTÃƒO]
     CONSTRAINT pk_detalhe_encomenda PRIMARY KEY (ID_ENCOMENDA, ID_PRODUTO),
     CONSTRAINT fk_detenc_enc FOREIGN KEY (ID_ENCOMENDA) REFERENCES Encomenda(ID_ENCOMENDA) ON DELETE CASCADE,
     CONSTRAINT fk_detenc_prod FOREIGN KEY (ID_PRODUTO) REFERENCES Produto(ID_PRODUTO),
-    CONSTRAINT chk_detenc_qtd_rec CHECK (QUANTIDADE_RECEBIDA >= 0 AND QUANTIDADE_RECEBIDA <= QUANTIDADE_ENCOMENDADA) -- [SUGESTÃO]
+    CONSTRAINT chk_detenc_qtd_rec CHECK (QUANTIDADE_RECEBIDA >= 0 AND QUANTIDADE_RECEBIDA <= QUANTIDADE_ENCOMENDADA) -- [SUGESTÃƒO]
 );
 COMMENT ON TABLE Detalhe_Encomenda IS 'Detalhe dos produtos e quantidades de cada encomenda.';
-COMMENT ON COLUMN Detalhe_Encomenda.QUANTIDADE_RECEBIDA IS '[SUGESTÃO] Quantidade efetivamente recebida para este produto nesta encomenda.';
+COMMENT ON COLUMN Detalhe_Encomenda.QUANTIDADE_RECEBIDA IS '[SUGESTÃƒO] Quantidade efetivamente recebida para este produto nesta encomenda.';
 
 CREATE TABLE Stock_Armazem (
     ID_ARMAZEM NUMBER(8,0) NOT NULL,
@@ -241,14 +241,14 @@ CREATE TABLE Stock_Armazem (
     STOCK_ATUAL NUMBER(6,0) DEFAULT 0 NOT NULL,
     QTD_MINIMA_STOCK NUMBER(6,0) DEFAULT 50,
     DATA_ULTIMA_ENTRADA DATE,
-    DATA_ULTIMA_SAIDA DATE, -- [SUGESTÃO]
+    DATA_ULTIMA_SAIDA DATE, -- [SUGESTÃƒO]
     CONSTRAINT pk_stock_arm PRIMARY KEY (ID_ARMAZEM, ID_PRODUTO),
     CONSTRAINT fk_stockarm_arm FOREIGN KEY (ID_ARMAZEM) REFERENCES Armazem(ID_ARMAZEM),
     CONSTRAINT fk_stockarm_prod FOREIGN KEY (ID_PRODUTO) REFERENCES Produto(ID_PRODUTO)
 );
-COMMENT ON TABLE Stock_Armazem IS 'Stock atual de cada produto em cada armazém.';
-COMMENT ON COLUMN Stock_Armazem.DATA_ULTIMA_ENTRADA IS 'Data da última receção deste produto (via Encomenda).';
-COMMENT ON COLUMN Stock_Armazem.DATA_ULTIMA_SAIDA IS '[SUGESTÃO] Data da última saída deste produto para uma Carga_Viagem.';
+COMMENT ON TABLE Stock_Armazem IS 'Stock atual de cada produto em cada armazÃ©m.';
+COMMENT ON COLUMN Stock_Armazem.DATA_ULTIMA_ENTRADA IS 'Data da Ãºltima receÃ§Ã£o deste produto (via Encomenda).';
+COMMENT ON COLUMN Stock_Armazem.DATA_ULTIMA_SAIDA IS '[SUGESTÃƒO] Data da Ãºltima saÃ­da deste produto para uma Carga_Viagem.';
 
 CREATE TABLE Log_Estado_Maquina (
     ID_LOG_ESTADO NUMBER(15,0) NOT NULL,
@@ -256,30 +256,30 @@ CREATE TABLE Log_Estado_Maquina (
     ID_ESTADO NUMBER(8,0) NOT NULL,
     DATA_INICIO_ESTADO TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL,
     DATA_FIM_ESTADO TIMESTAMP,
-    ORIGEM_ALTERACAO VARCHAR2(50 BYTE), -- [SUGESTÃO]
+    ORIGEM_ALTERACAO VARCHAR2(50 BYTE), -- [SUGESTÃƒO]
     CONSTRAINT pk_log_estado PRIMARY KEY (ID_LOG_ESTADO),
     CONSTRAINT fk_logestado_maq FOREIGN KEY (ID_MAQUINA) REFERENCES Maquina(ID_MAQUINA) ON DELETE CASCADE,
     CONSTRAINT fk_logestado_est FOREIGN KEY (ID_ESTADO) REFERENCES Estado_Maquina(ID_ESTADO)
 );
-COMMENT ON TABLE Log_Estado_Maquina IS 'Histórico das mudanças de estado de cada máquina.';
-COMMENT ON COLUMN Log_Estado_Maquina.ORIGEM_ALTERACAO IS '[SUGESTÃO] Indica o que despoletou a mudança de estado (ex: comunicação da máquina, intervenção manual, trigger).';
+COMMENT ON TABLE Log_Estado_Maquina IS 'HistÃ³rico das mudanÃ§as de estado de cada mÃ¡quina.';
+COMMENT ON COLUMN Log_Estado_Maquina.ORIGEM_ALTERACAO IS '[SUGESTÃƒO] Indica o que despoletou a mudanÃ§a de estado (ex: comunicaÃ§Ã£o da mÃ¡quina, intervenÃ§Ã£o manual, trigger).';
 
 CREATE TABLE Carga_Viagem (
     ID_CARGA NUMBER(15,0) NOT NULL,
     ID_VIAGEM NUMBER(15,0) NOT NULL,
     ID_PRODUTO NUMBER(8,0) NOT NULL,
     QUANTIDADE_CARREGADA NUMBER(6,0) NOT NULL,
-    QUANTIDADE_ATUAL_VEICULO NUMBER(6,0),      -- << ALTERAÇÃO (Q32) >>
+    QUANTIDADE_ATUAL_VEICULO NUMBER(6,0),      -- << ALTERAÃ‡ÃƒO (Q32) >>
     CONSTRAINT pk_carga_viagem PRIMARY KEY (ID_CARGA),
     CONSTRAINT fk_carga_viag_viag FOREIGN KEY (ID_VIAGEM) REFERENCES Viagem(ID_VIAGEM) ON DELETE CASCADE,
     CONSTRAINT fk_carga_viag_prod FOREIGN KEY (ID_PRODUTO) REFERENCES Produto(ID_PRODUTO),
     CONSTRAINT uk_carga_viag_prod UNIQUE (ID_VIAGEM, ID_PRODUTO),
     CONSTRAINT chk_carga_viag_qtd CHECK (QUANTIDADE_CARREGADA >= 0),
-    CONSTRAINT chk_carga_viag_qtd_atual CHECK (QUANTIDADE_ATUAL_VEICULO >= 0 AND QUANTIDADE_ATUAL_VEICULO <= QUANTIDADE_CARREGADA) -- << ALTERAÇÃO >>
+    CONSTRAINT chk_carga_viag_qtd_atual CHECK (QUANTIDADE_ATUAL_VEICULO >= 0 AND QUANTIDADE_ATUAL_VEICULO <= QUANTIDADE_CARREGADA) -- << ALTERAÃ‡ÃƒO >>
 );
-COMMENT ON TABLE Carga_Viagem IS 'Registo dos produtos carregados no veículo no início da viagem (para Q31).';
-COMMENT ON COLUMN Carga_Viagem.QUANTIDADE_CARREGADA IS 'Quantidade do produto carregada no veículo no início da viagem.';
-COMMENT ON COLUMN Carga_Viagem.QUANTIDADE_ATUAL_VEICULO IS 'Quantidade do produto que permanece no veículo. Inicialmente = Qtd Carregada, decrementada pelo Trigger update_viagem. (Para Q32)';
+COMMENT ON TABLE Carga_Viagem IS 'Registo dos produtos carregados no veÃ­culo no inÃ­cio da viagem (para Q31).';
+COMMENT ON COLUMN Carga_Viagem.QUANTIDADE_CARREGADA IS 'Quantidade do produto carregada no veÃ­culo no inÃ­cio da viagem.';
+COMMENT ON COLUMN Carga_Viagem.QUANTIDADE_ATUAL_VEICULO IS 'Quantidade do produto que permanece no veÃ­culo. Inicialmente = Qtd Carregada, decrementada pelo Trigger update_viagem. (Para Q32)';
 
 CREATE TABLE Venda (
     ID_VENDA NUMBER(15,0) NOT NULL,
@@ -292,19 +292,19 @@ CREATE TABLE Venda (
     VALOR_TOTAL NUMBER(10,2),
     TIPO_PAGAMENTO VARCHAR2(20 BYTE),
     ESTADO_VENDA VARCHAR2(20 BYTE),
-    ID_TRANSACAO_PAGAMENTO VARCHAR2(100 BYTE), -- [SUGESTÃO]
+    ID_TRANSACAO_PAGAMENTO VARCHAR2(100 BYTE), -- [SUGESTÃƒO]
     CONSTRAINT pk_venda_aabd PRIMARY KEY (ID_VENDA),
     CONSTRAINT fk_venda_maq_aabd FOREIGN KEY (ID_MAQUINA) REFERENCES Maquina(ID_MAQUINA),
     CONSTRAINT fk_venda_prod_aabd FOREIGN KEY (ID_PRODUTO) REFERENCES Produto(ID_PRODUTO),
     CONSTRAINT fk_venda_comp_aabd FOREIGN KEY (ID_COMPARTIMENTO) REFERENCES Compartimento(ID_COMPARTIMENTO)
 );
-COMMENT ON TABLE Venda IS 'Registo de cada venda efetuada numa máquina.';
+COMMENT ON TABLE Venda IS 'Registo de cada venda efetuada numa mÃ¡quina.';
 COMMENT ON COLUMN Venda.ID_COMPARTIMENTO IS 'Identifica o compartimento de onde o produto foi retirado.';
-COMMENT ON COLUMN Venda.PRECO_UNITARIO_REGISTADO IS 'Preço unitário do produto no momento exato da venda.';
-COMMENT ON COLUMN Venda.TIPO_PAGAMENTO IS 'Método de pagamento usado (Multibanco, MBWay).';
-COMMENT ON COLUMN Venda.ID_TRANSACAO_PAGAMENTO IS '[SUGESTÃO] Identificador único da transação no sistema de pagamentos externo.';
+COMMENT ON COLUMN Venda.PRECO_UNITARIO_REGISTADO IS 'PreÃ§o unitÃ¡rio do produto no momento exato da venda.';
+COMMENT ON COLUMN Venda.TIPO_PAGAMENTO IS 'MÃ©todo de pagamento usado (Multibanco, MBWay).';
+COMMENT ON COLUMN Venda.ID_TRANSACAO_PAGAMENTO IS '[SUGESTÃƒO] Identificador Ãºnico da transaÃ§Ã£o no sistema de pagamentos externo.';
 
-CREATE TABLE Manutencao ( -- << ALTERAÇÃO (Q39, Q40) >>
+CREATE TABLE Manutencao ( -- << ALTERAÃ‡ÃƒO (Q39, Q40) >>
     ID_MANUTENCAO NUMBER(15,0) NOT NULL,
     ID_MAQUINA NUMBER(10,0) NOT NULL,
     ID_FUNCIONARIO NUMBER(8,0),
@@ -324,13 +324,13 @@ CREATE TABLE Manutencao ( -- << ALTERAÇÃO (Q39, Q40) >>
     CONSTRAINT fk_manut_est_depois FOREIGN KEY (ESTADO_MAQUINA_DEPOIS) REFERENCES Estado_Maquina(ID_ESTADO),
     CONSTRAINT chk_manut_datas CHECK (DATA_HORA_FIM IS NULL OR DATA_HORA_FIM >= DATA_HORA_INICIO)
 );
-COMMENT ON TABLE Manutencao IS 'Registo detalhado das intervenções de manutenção realizadas nas máquinas (para Q39, Q40).';
-COMMENT ON COLUMN Manutencao.ID_PARAGEM IS 'Referência opcional à paragem da viagem durante a qual a manutenção foi feita.';
-COMMENT ON COLUMN Manutencao.TIPO_MANUTENCAO IS 'Classificação da manutenção realizada.';
-COMMENT ON COLUMN Manutencao.DESCRICAO_SERVICO IS 'Descrição detalhada dos trabalhos efetuados.';
-COMMENT ON COLUMN Manutencao.PECAS_USADAS IS 'Descrição ou referência das peças substituídas/utilizadas.';
-COMMENT ON COLUMN Manutencao.ESTADO_MAQUINA_ANTES IS 'Estado da máquina registado no início da manutenção.';
-COMMENT ON COLUMN Manutencao.ESTADO_MAQUINA_DEPOIS IS 'Estado da máquina registado no fim da manutenção.';
+COMMENT ON TABLE Manutencao IS 'Registo detalhado das intervenÃ§Ãµes de manutenÃ§Ã£o realizadas nas mÃ¡quinas (para Q39, Q40).';
+COMMENT ON COLUMN Manutencao.ID_PARAGEM IS 'ReferÃªncia opcional Ã  paragem da viagem durante a qual a manutenÃ§Ã£o foi feita.';
+COMMENT ON COLUMN Manutencao.TIPO_MANUTENCAO IS 'ClassificaÃ§Ã£o da manutenÃ§Ã£o realizada.';
+COMMENT ON COLUMN Manutencao.DESCRICAO_SERVICO IS 'DescriÃ§Ã£o detalhada dos trabalhos efetuados.';
+COMMENT ON COLUMN Manutencao.PECAS_USADAS IS 'DescriÃ§Ã£o ou referÃªncia das peÃ§as substituÃ­das/utilizadas.';
+COMMENT ON COLUMN Manutencao.ESTADO_MAQUINA_ANTES IS 'Estado da mÃ¡quina registado no inÃ­cio da manutenÃ§Ã£o.';
+COMMENT ON COLUMN Manutencao.ESTADO_MAQUINA_DEPOIS IS 'Estado da mÃ¡quina registado no fim da manutenÃ§Ã£o.';
 
 CREATE SEQUENCE seq_config_comp START WITH 10000 INCREMENT BY 1 NOCACHE NOCYCLE;
 CREATE SEQUENCE seq_viagem START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
@@ -340,6 +340,6 @@ CREATE SEQUENCE seq_encomenda START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
 CREATE SEQUENCE seq_log_estado START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
 CREATE SEQUENCE seq_carga_viagem START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
 CREATE SEQUENCE seq_venda_aabd START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE;
-CREATE SEQUENCE seq_manutencao START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE; -- << ALTERAÇÃO >>
+CREATE SEQUENCE seq_manutencao START WITH 1 INCREMENT BY 1 NOCACHE NOCYCLE; -- << ALTERAÃ‡ÃƒO >>
 
 COMMIT; -- Commit da estrutura
