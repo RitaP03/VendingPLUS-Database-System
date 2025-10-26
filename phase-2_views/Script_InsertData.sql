@@ -1,6 +1,6 @@
 
 -- =============================================================================
--- Secção 3: Inserção de Dados (Base + Cenários Vistas A-O)
+-- SecÃ§Ã£o 3: InserÃ§Ã£o de Dados (Base + CenÃ¡rios Vistas A-O)
 -- =============================================================================
 
 -- ==================================================
@@ -30,10 +30,10 @@ INSERT ALL
 SELECT * FROM dual;
 
 INSERT ALL
-    INTO Veiculo (MATRICULA, MARCA, MODELO, TARA, AUTONOMIA_MAX_KM, ESTADO_VEICULO, ID_ARMAZEM_BASE) VALUES ('DD-66-77', 'SCANIA', 'SERIE L', 7500, 280, 'Disponível', 1)
-    INTO Veiculo (MATRICULA, MARCA, MODELO, TARA, AUTONOMIA_MAX_KM, ESTADO_VEICULO, ID_ARMAZEM_BASE) VALUES ('AA-11-BB', 'Renault', 'Kangoo ZE', 1500, 300, 'Disponível', 1)
-    INTO Veiculo (MATRICULA, MARCA, MODELO, TARA, AUTONOMIA_MAX_KM, ESTADO_VEICULO, ID_ARMAZEM_BASE) VALUES ('CC-22-DD', 'Mercedes', 'eSprinter', 2800, 250, 'Disponível', 2)
-    INTO Veiculo (MATRICULA, MARCA, MODELO, TARA, AUTONOMIA_MAX_KM, ESTADO_VEICULO, ID_ARMAZEM_BASE) VALUES ('EE-33-FF', 'Renault', 'Master ZE', 3000, 300, 'Manutenção', 1)
+    INTO Veiculo (MATRICULA, MARCA, MODELO, TARA, AUTONOMIA_MAX_KM, ESTADO_VEICULO, ID_ARMAZEM_BASE) VALUES ('DD-66-77', 'SCANIA', 'SERIE L', 7500, 280, 'DisponÃ­vel', 1)
+    INTO Veiculo (MATRICULA, MARCA, MODELO, TARA, AUTONOMIA_MAX_KM, ESTADO_VEICULO, ID_ARMAZEM_BASE) VALUES ('AA-11-BB', 'Renault', 'Kangoo ZE', 1500, 300, 'DisponÃ­vel', 1)
+    INTO Veiculo (MATRICULA, MARCA, MODELO, TARA, AUTONOMIA_MAX_KM, ESTADO_VEICULO, ID_ARMAZEM_BASE) VALUES ('CC-22-DD', 'Mercedes', 'eSprinter', 2800, 250, 'DisponÃ­vel', 2)
+    INTO Veiculo (MATRICULA, MARCA, MODELO, TARA, AUTONOMIA_MAX_KM, ESTADO_VEICULO, ID_ARMAZEM_BASE) VALUES ('EE-33-FF', 'Renault', 'Master ZE', 3000, 300, 'ManutenÃ§Ã£o', 1)
 SELECT * FROM dual;
 
 INSERT ALL
@@ -187,7 +187,7 @@ SELECT * FROM dual;
 COMMIT;
 
 -- ==================================================
--- Dados para Cenários Específicos das Vistas (A-O)
+-- Dados para CenÃ¡rios EspecÃ­ficos das Vistas (A-O)
 -- ==================================================
 
 -- Dados para VIEW A [71, 174] (Snacks, Coimbra, Reabastecido Ontem, Stock Atual 0)
@@ -197,7 +197,7 @@ DECLARE
     v_abast_id NUMBER;
 BEGIN
     INSERT INTO Viagem (ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, ID_ARMAZEM_FIM, DATA_HORA_INICIO, DATA_HORA_FIM, DISTANCIA_TOTAL_KM, ESTADO_VIAGEM)
-    VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 2, 2, TO_TIMESTAMP('2025-04-05 08:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-04-05 08:45:00', 'YYYY-MM-DD HH24:MI:SS'), 5.2, 'Concluída')
+    VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 2, 2, TO_TIMESTAMP('2025-04-05 08:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-04-05 08:45:00', 'YYYY-MM-DD HH24:MI:SS'), 5.2, 'ConcluÃ­da')
     RETURNING ID_VIAGEM INTO v_viagem_id_a;
 
     INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA, TIPO_VISITA, DISTANCIA_PERCORRIDA_KM)
@@ -223,14 +223,14 @@ BEGIN
         INSERT INTO Venda (ID_VENDA, ID_MAQUINA, ID_PRODUTO, ID_COMPARTIMENTO, DATA_VENDA, QUANTIDADE, PRECO_UNITARIO_REGISTADO, VALOR_TOTAL, TIPO_PAGAMENTO, ESTADO_VENDA)
             VALUES (seq_venda_aabd.NEXTVAL, 1, 9904, 104, TO_TIMESTAMP('2025-04-05 09:15:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL(i*10, 'MINUTE'), 1, 1.10, 1.10, 'Multibanco', 'Concluida');
     END LOOP;
-    -- Se trigger update_stock NÃO ativo, forçar stock a 0 manualmente:
+    -- Se trigger update_stock NÃƒO ativo, forÃ§ar stock a 0 manualmente:
     /*
     UPDATE Configuracao_Compartimento SET STOCK_ATUAL = 0 WHERE ID_COMPARTIMENTO IN (101, 102, 103, 104);
     */
 END;
 /
 
--- Dados para VIEW B [75, 176] (Viagem específica, Abastecimento MARS)
+-- Dados para VIEW B [75, 176] (Viagem especÃ­fica, Abastecimento MARS)
 DECLARE
     v_viagem_id_b NUMBER;
     v_paragem_id_b1 NUMBER;
@@ -238,7 +238,7 @@ DECLARE
     v_carga_id NUMBER;
 BEGIN
     INSERT INTO Viagem (ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, ID_ARMAZEM_FIM, DATA_HORA_INICIO, DATA_HORA_FIM, DISTANCIA_TOTAL_KM, ESTADO_VIAGEM)
-    VALUES (seq_viagem.NEXTVAL, 102, 'CC-22-DD', 1, 1, TO_TIMESTAMP('2025-03-11 09:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-03-11 11:30:00', 'YYYY-MM-DD HH24:MI:SS'), 30.0, 'Concluída')
+    VALUES (seq_viagem.NEXTVAL, 102, 'CC-22-DD', 1, 1, TO_TIMESTAMP('2025-03-11 09:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-03-11 11:30:00', 'YYYY-MM-DD HH24:MI:SS'), 30.0, 'ConcluÃ­da')
     RETURNING ID_VIAGEM INTO v_viagem_id_b;
 
     INSERT INTO Carga_Viagem(ID_CARGA, ID_VIAGEM, ID_PRODUTO, QUANTIDADE_CARREGADA, QUANTIDADE_ATUAL_VEICULO)
@@ -271,7 +271,7 @@ BEGIN
 END;
 /
 
--- Dados para VIEW C [79, 179] (Mais Vendido Mês Anterior - Março 2025)
+-- Dados para VIEW C [79, 179] (Mais Vendido MÃªs Anterior - MarÃ§o 2025)
 DECLARE
     v_venda_id NUMBER;
 BEGIN
@@ -293,13 +293,13 @@ BEGIN
 END;
 /
 
--- Dados para VIEW D [84, 183] (Máquinas perto Taveiro com KitKat)
+-- Dados para VIEW D [84, 183] (MÃ¡quinas perto Taveiro com KitKat)
 DECLARE
     v_viagem_id_d NUMBER;
     v_paragem_id_d NUMBER;
 BEGIN
     INSERT INTO Viagem (ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, ID_ARMAZEM_FIM, DATA_HORA_INICIO, DATA_HORA_FIM, DISTANCIA_TOTAL_KM, ESTADO_VIAGEM)
-    VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 1, 1, TO_TIMESTAMP('2025-02-21 08:30:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-02-21 10:00:00', 'YYYY-MM-DD HH24:MI:SS'), 15.0, 'Concluída')
+    VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 1, 1, TO_TIMESTAMP('2025-02-21 08:30:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-02-21 10:00:00', 'YYYY-MM-DD HH24:MI:SS'), 15.0, 'ConcluÃ­da')
     RETURNING ID_VIAGEM INTO v_viagem_id_d;
 
     INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA, TIPO_VISITA, DISTANCIA_PERCORRIDA_KM)
@@ -315,7 +315,7 @@ BEGIN
 END;
 /
 
--- Dados para VIEW E [87, 186] (Média Vendas 2023/24)
+-- Dados para VIEW E [87, 186] (MÃ©dia Vendas 2023/24)
 DECLARE
     v_venda_id NUMBER;
     v_viagem_id NUMBER;
@@ -334,7 +334,7 @@ BEGIN
     FOR y IN 2023..2024 LOOP
         FOR i IN 1..25 LOOP
              INSERT INTO Viagem (ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, DATA_HORA_INICIO, DATA_HORA_FIM, ESTADO_VIAGEM)
-             VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 1, TO_TIMESTAMP(y || '-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( (i/25)*364 , 'DAY'), TO_TIMESTAMP(y || '-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( (i/25)*364 + 0.2 , 'DAY'), 'Concluída')
+             VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 1, TO_TIMESTAMP(y || '-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( (i/25)*364 , 'DAY'), TO_TIMESTAMP(y || '-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( (i/25)*364 + 0.2 , 'DAY'), 'ConcluÃ­da')
              RETURNING ID_VIAGEM INTO v_viagem_id;
              INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA)
              VALUES (seq_paragem.NEXTVAL, v_viagem_id, 773, 1, TO_TIMESTAMP(y || '-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( (i/25)*364 + 0.1 , 'DAY'), TO_TIMESTAMP(y || '-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( (i/25)*364 + 0.15 , 'DAY'))
@@ -348,7 +348,7 @@ BEGIN
 END;
 /
 
--- Dados para VIEW F [89, 191] (Máquina que vendeu mais AGUA 72h, Detalhes Fev 2025)
+-- Dados para VIEW F [89, 191] (MÃ¡quina que vendeu mais AGUA 72h, Detalhes Fev 2025)
 DECLARE
     v_viagem_id_f NUMBER;
     v_paragem_id_f NUMBER;
@@ -358,7 +358,7 @@ DECLARE
     v_outros_fev NUMBER := v_total_fev - v_agua_fev;
 BEGIN
     INSERT INTO Viagem (ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, DATA_HORA_INICIO, DATA_HORA_FIM, ESTADO_VIAGEM)
-    VALUES (seq_viagem.NEXTVAL, 102, 'AA-11-BB', 1, TO_TIMESTAMP('2025-02-10 10:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-02-10 11:15:00', 'YYYY-MM-DD HH24:MI:SS'), 'Concluída')
+    VALUES (seq_viagem.NEXTVAL, 102, 'AA-11-BB', 1, TO_TIMESTAMP('2025-02-10 10:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-02-10 11:15:00', 'YYYY-MM-DD HH24:MI:SS'), 'ConcluÃ­da')
     RETURNING ID_VIAGEM INTO v_viagem_id_f;
     INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA)
     VALUES (seq_paragem.NEXTVAL, v_viagem_id_f, 884, 1, TO_TIMESTAMP('2025-02-10 10:30:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-02-10 11:00:00', 'YYYY-MM-DD HH24:MI:SS'))
@@ -366,7 +366,7 @@ BEGIN
     INSERT INTO Abastecimento_Detalhe (ID_ABASTECIMENTO, ID_PARAGEM, ID_PRODUTO, ID_COMPARTIMENTO, QUANTIDADE_ABASTECIDA, STOCK_ANTES_ABAST, STOCK_DEPOIS_ABAST)
     VALUES (seq_abastecimento.NEXTVAL, v_paragem_id_f, 8878, 8841, 490, 5, 495);
 
-    FOR i IN 1..456 LOOP -- Reduzir loops para teste rápido se necessário
+    FOR i IN 1..456 LOOP -- Reduzir loops para teste rÃ¡pido se necessÃ¡rio
         INSERT INTO Venda (ID_VENDA, ID_MAQUINA, ID_PRODUTO, ID_COMPARTIMENTO, DATA_VENDA, QUANTIDADE, PRECO_UNITARIO_REGISTADO, VALOR_TOTAL, TIPO_PAGAMENTO, ESTADO_VENDA)
             VALUES (seq_venda_aabd.NEXTVAL, 884, 8878, 8841, TO_TIMESTAMP('2025-02-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( (i/456)*27 , 'DAY'), 1, 0.90, 0.90, 'MBWay', 'Concluida')
             RETURNING ID_VENDA INTO v_venda_id;
@@ -404,7 +404,7 @@ BEGIN
         INSERT INTO Viagem (ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, DATA_HORA_INICIO, DATA_HORA_FIM, ESTADO_VIAGEM)
         VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', CASE WHEN MOD(i,2)=0 THEN 1 ELSE 2 END,
             TO_TIMESTAMP('2024-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( (i/v_num_viagens_g)*365 , 'DAY'),
-            TO_TIMESTAMP('2024-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( (i/v_num_viagens_g)*365 + 0.3 + DBMS_RANDOM.VALUE(0,0.2) , 'DAY'), 'Concluída')
+            TO_TIMESTAMP('2024-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( (i/v_num_viagens_g)*365 + 0.3 + DBMS_RANDOM.VALUE(0,0.2) , 'DAY'), 'ConcluÃ­da')
         RETURNING ID_VIAGEM INTO v_viagem_id;
 
         INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA) VALUES (seq_paragem.NEXTVAL, v_viagem_id, 1, 1, TO_TIMESTAMP('2024-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( (i/v_num_viagens_g)*365 + 0.1 , 'DAY'), TO_TIMESTAMP('2024-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL( (i/v_num_viagens_g)*365 + 0.12 , 'DAY')) RETURNING ID_PARAGEM INTO v_paragem_id;
@@ -434,7 +434,7 @@ BEGIN
 END;
 /
 
--- Dados para VIEW H [97, 198] (Veículos mais usados Março 2025...)
+-- Dados para VIEW H [97, 198] (VeÃ­culos mais usados MarÃ§o 2025...)
 DECLARE
     v_viagem_id NUMBER;
     v_paragem_id NUMBER;
@@ -443,7 +443,7 @@ DECLARE
 BEGIN
      DBMS_OUTPUT.PUT_LINE('A gerar dados (amostra) para VIEW H...');
     INSERT INTO Viagem (ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, DATA_HORA_INICIO, DATA_HORA_FIM, DISTANCIA_TOTAL_KM, ESTADO_VIAGEM)
-    VALUES (seq_viagem.NEXTVAL, 101, 'DD-66-77', 1, TO_TIMESTAMP('2025-03-20 08:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-03-20 14:00:00', 'YYYY-MM-DD HH24:MI:SS'), 75.2, 'Concluída')
+    VALUES (seq_viagem.NEXTVAL, 101, 'DD-66-77', 1, TO_TIMESTAMP('2025-03-20 08:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-03-20 14:00:00', 'YYYY-MM-DD HH24:MI:SS'), 75.2, 'ConcluÃ­da')
     RETURNING ID_VIAGEM INTO v_viagem_id;
         INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA) VALUES (seq_paragem.NEXTVAL, v_viagem_id, 787, 1, TO_TIMESTAMP('2025-03-20 09:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-03-20 09:30:00', 'YYYY-MM-DD HH24:MI:SS')) RETURNING ID_PARAGEM INTO v_paragem_id;
             INSERT INTO Abastecimento_Detalhe (ID_ABASTECIMENTO, ID_PARAGEM, ID_PRODUTO, ID_COMPARTIMENTO, QUANTIDADE_ABASTECIDA) VALUES (seq_abastecimento.NEXTVAL, v_paragem_id, 8871, 7873, 10) RETURNING ID_ABASTECIMENTO INTO v_abast_id;
@@ -463,7 +463,7 @@ BEGIN
                 TO_TIMESTAMP('2025-03-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL(i*3, 'DAY'),
                 TO_TIMESTAMP('2025-03-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL(i*3 + 0.4, 'DAY'),
                 40 + i*10,
-                'Concluída')
+                'ConcluÃ­da')
         RETURNING ID_VIAGEM INTO v_viagem_id;
         IF MOD(i,2) = 0 AND (40 + i*10) > 50 THEN
              INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA) VALUES (seq_paragem.NEXTVAL, v_viagem_id, 1, 1, TO_TIMESTAMP('2025-03-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL(i*3 + 0.1, 'DAY'), TO_TIMESTAMP('2025-03-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL(i*3 + 0.12, 'DAY')) RETURNING ID_PARAGEM INTO v_paragem_id;
@@ -477,7 +477,7 @@ BEGIN
 END;
 /
 
--- Dados para VIEW I [100, 201] (Top 3 Máquinas Visitadas...)
+-- Dados para VIEW I [100, 201] (Top 3 MÃ¡quinas Visitadas...)
 DECLARE
     v_viagem_id NUMBER;
     v_paragem_id NUMBER;
@@ -491,7 +491,7 @@ BEGIN
         VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 1,
                 TO_TIMESTAMP('2025-01-01 09:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL(i*3, 'DAY'),
                 TO_TIMESTAMP('2025-01-01 15:00:00', 'YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL(i*3, 'DAY'),
-                'Concluída')
+                'ConcluÃ­da')
         RETURNING ID_VIAGEM INTO v_viagem_id;
 
         INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA, TIPO_VISITA)
@@ -526,13 +526,13 @@ BEGIN
 
     FOR i IN 1..v_num_viagens_outras LOOP
         INSERT INTO Viagem (ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, DATA_HORA_INICIO, DATA_HORA_FIM, ESTADO_VIAGEM)
-        VALUES (seq_viagem.NEXTVAL, 102, 'CC-22-DD', 2, SYSTIMESTAMP - NUMTODSINTERVAL(i*5, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(i*5 - 0.3, 'DAY'), 'Concluída')
+        VALUES (seq_viagem.NEXTVAL, 102, 'CC-22-DD', 2, SYSTIMESTAMP - NUMTODSINTERVAL(i*5, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(i*5 - 0.3, 'DAY'), 'ConcluÃ­da')
         RETURNING ID_VIAGEM INTO v_viagem_id;
     END LOOP;
 END;
 /
 
--- Dados para VIEW J [202] (Histórico de Estados)
+-- Dados para VIEW J [202] (HistÃ³rico de Estados)
 DECLARE
     v_log_id NUMBER;
 BEGIN
@@ -561,7 +561,7 @@ BEGIN
 END;
 /
 
--- Dados para VIEW K [208] (Eficiência de Viagens)
+-- Dados para VIEW K [208] (EficiÃªncia de Viagens)
 DECLARE
     v_rota_id NUMBER;
     v_viagem_id NUMBER;
@@ -569,14 +569,14 @@ DECLARE
     v_abast_id NUMBER;
 BEGIN
     INSERT INTO Rota (ID_ROTA, NOME_ROTA, DESCRICAO, ID_ARMAZEM_ORIGEM, DISTANCIA_TOTAL_KM, ATIVO)
-    VALUES (1, 'Rota Centro Coimbra', 'Máquinas na baixa e Celas', 2, 25.5, 'S')
+    VALUES (1, 'Rota Centro Coimbra', 'MÃ¡quinas na baixa e Celas', 2, 25.5, 'S')
     RETURNING ID_ROTA INTO v_rota_id;
         INSERT INTO Detalhe_Rota (ID_ROTA, ID_MAQUINA, ORDEM_VISITA) VALUES (v_rota_id, 1, 1);
         INSERT INTO Detalhe_Rota (ID_ROTA, ID_MAQUINA, ORDEM_VISITA) VALUES (v_rota_id, 63, 2);
         INSERT INTO Detalhe_Rota (ID_ROTA, ID_MAQUINA, ORDEM_VISITA) VALUES (v_rota_id, 1001, 3);
 
     INSERT INTO Viagem (ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, ID_ARMAZEM_FIM, ID_ROTA, DATA_HORA_INICIO, DATA_HORA_FIM, DISTANCIA_TOTAL_KM, ESTADO_VIAGEM)
-    VALUES (seq_viagem.NEXTVAL, 102, 'CC-22-DD', 2, 2, v_rota_id, SYSTIMESTAMP - NUMTODSINTERVAL(2, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(1.8, 'DAY'), 28.0, 'Concluída')
+    VALUES (seq_viagem.NEXTVAL, 102, 'CC-22-DD', 2, 2, v_rota_id, SYSTIMESTAMP - NUMTODSINTERVAL(2, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(1.8, 'DAY'), 28.0, 'ConcluÃ­da')
     RETURNING ID_VIAGEM INTO v_viagem_id;
         INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA, TIPO_VISITA) VALUES (seq_paragem.NEXTVAL, v_viagem_id, 1, 1, SYSTIMESTAMP - NUMTODSINTERVAL(1.95, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(1.91, 'DAY'), 'Abastecimento') RETURNING ID_PARAGEM INTO v_paragem_id;
              INSERT INTO Abastecimento_Detalhe (ID_ABASTECIMENTO, ID_PARAGEM, ID_PRODUTO, ID_COMPARTIMENTO, QUANTIDADE_ABASTECIDA) VALUES (seq_abastecimento.NEXTVAL, v_paragem_id, 8871, 105, 8) RETURNING ID_ABASTECIMENTO INTO v_abast_id;
@@ -585,7 +585,7 @@ BEGIN
         INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA, TIPO_VISITA) VALUES (seq_paragem.NEXTVAL, v_viagem_id, 1001, 3, SYSTIMESTAMP - NUMTODSINTERVAL(1.87, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(1.86, 'DAY'), 'Verificacao') RETURNING ID_PARAGEM INTO v_paragem_id;
 
     INSERT INTO Viagem (ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, ID_ARMAZEM_FIM, ID_ROTA, DATA_HORA_INICIO, DATA_HORA_FIM, DISTANCIA_TOTAL_KM, ESTADO_VIAGEM)
-    VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 1, 1, NULL, SYSTIMESTAMP - NUMTODSINTERVAL(3, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(2.7, 'DAY'), 45.0, 'Concluída')
+    VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 1, 1, NULL, SYSTIMESTAMP - NUMTODSINTERVAL(3, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(2.7, 'DAY'), 45.0, 'ConcluÃ­da')
     RETURNING ID_VIAGEM INTO v_viagem_id;
         INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA, TIPO_VISITA) VALUES (seq_paragem.NEXTVAL, v_viagem_id, 1002, 1, SYSTIMESTAMP - NUMTODSINTERVAL(2.9, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(2.88, 'DAY'), 'Abastecimento') RETURNING ID_PARAGEM INTO v_paragem_id;
              INSERT INTO Abastecimento_Detalhe (ID_ABASTECIMENTO, ID_PARAGEM, ID_PRODUTO, ID_COMPARTIMENTO, QUANTIDADE_ABASTECIDA) VALUES (seq_abastecimento.NEXTVAL, v_paragem_id, 8871, 10021, 10) RETURNING ID_ABASTECIMENTO INTO v_abast_id;
@@ -594,7 +594,7 @@ BEGIN
 END;
 /
 
--- Dados para VIEW L [216] (Faturação Últimas 3 Semanas - 17 Mar a 6 Abr)
+-- Dados para VIEW L [216] (FaturaÃ§Ã£o Ãšltimas 3 Semanas - 17 Mar a 6 Abr)
 DECLARE
     v_venda_id NUMBER;
 BEGIN
@@ -621,13 +621,13 @@ BEGIN
 END;
 /
 
--- Dados para VIEW M [223] (Stock < 20% E Último Abast > 5 dias)
+-- Dados para VIEW M [223] (Stock < 20% E Ãšltimo Abast > 5 dias)
 DECLARE
     v_viagem_id NUMBER;
     v_paragem_id NUMBER;
 BEGIN
     INSERT INTO Viagem (ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, DATA_HORA_INICIO, DATA_HORA_FIM, ESTADO_VIAGEM)
-    VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 1, TO_TIMESTAMP('2025-04-01 09:00:00','YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-04-01 10:00:00','YYYY-MM-DD HH24:MI:SS'), 'Concluída')
+    VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 1, TO_TIMESTAMP('2025-04-01 09:00:00','YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-04-01 10:00:00','YYYY-MM-DD HH24:MI:SS'), 'ConcluÃ­da')
     RETURNING ID_VIAGEM INTO v_viagem_id;
     INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA)
     VALUES (seq_paragem.NEXTVAL, v_viagem_id, 773, 1, TO_TIMESTAMP('2025-04-01 09:30:00','YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-04-01 09:50:00','YYYY-MM-DD HH24:MI:SS'))
@@ -637,7 +637,7 @@ BEGIN
 
     UPDATE Configuracao_Compartimento SET STOCK_ATUAL = 5 WHERE ID_COMPARTIMENTO = 10021;
     INSERT INTO Viagem (ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, DATA_HORA_INICIO, DATA_HORA_FIM, ESTADO_VIAGEM)
-    VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 1, SYSTIMESTAMP - NUMTODSINTERVAL(2, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(1.9, 'DAY'), 'Concluída')
+    VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 1, SYSTIMESTAMP - NUMTODSINTERVAL(2, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(1.9, 'DAY'), 'ConcluÃ­da')
     RETURNING ID_VIAGEM INTO v_viagem_id;
     INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA)
     VALUES (seq_paragem.NEXTVAL, v_viagem_id, 1002, 1, SYSTIMESTAMP - NUMTODSINTERVAL(1.95, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(1.92, 'DAY'))
@@ -647,7 +647,7 @@ BEGIN
 END;
 /
 
--- Dados para VIEW N [232] (Vendas por Tipo Produto e Faixa Horária)
+-- Dados para VIEW N [232] (Vendas por Tipo Produto e Faixa HorÃ¡ria)
 DECLARE
     v_venda_id NUMBER;
 BEGIN
@@ -669,16 +669,16 @@ BEGIN
 END;
 /
 
--- Dados para VIEW O [238] (Configurações Ativas Não Reabastecidas no Último Mês)
+-- Dados para VIEW O [238] (ConfiguraÃ§Ãµes Ativas NÃ£o Reabastecidas no Ãšltimo MÃªs)
 DECLARE
     v_viagem_id NUMBER;
     v_paragem_id NUMBER;
 BEGIN
-    -- Maquina 1001, Comp 10013, Prod 9955 (Bolacha Maria) - NÃO abastecer recentemente. OK pela VIEW I.
+    -- Maquina 1001, Comp 10013, Prod 9955 (Bolacha Maria) - NÃƒO abastecer recentemente. OK pela VIEW I.
 
     -- Abastecer Agua Luso (8870) em Maquina 1001, Comp 10011 recentemente.
     INSERT INTO Viagem (ID_VIAGEM, ID_FUNCIONARIO, MATRICULA_VEICULO, ID_ARMAZEM_ORIGEM, DATA_HORA_INICIO, DATA_HORA_FIM, ESTADO_VIAGEM)
-    VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 1, SYSTIMESTAMP - NUMTODSINTERVAL(10, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(9.8, 'DAY'), 'Concluída')
+    VALUES (seq_viagem.NEXTVAL, 101, 'AA-11-BB', 1, SYSTIMESTAMP - NUMTODSINTERVAL(10, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(9.8, 'DAY'), 'ConcluÃ­da')
     RETURNING ID_VIAGEM INTO v_viagem_id;
     INSERT INTO Paragem (ID_PARAGEM, ID_VIAGEM, ID_MAQUINA, ORDEM_VISITA, DATA_HORA_CHEGADA, DATA_HORA_SAIDA)
     VALUES (seq_paragem.NEXTVAL, v_viagem_id, 1001, 1, SYSTIMESTAMP - NUMTODSINTERVAL(9.9, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(9.85, 'DAY'))
@@ -686,46 +686,46 @@ BEGIN
     INSERT INTO Abastecimento_Detalhe (ID_ABASTECIMENTO, ID_PARAGEM, ID_PRODUTO, ID_COMPARTIMENTO, QUANTIDADE_ABASTECIDA)
     VALUES (seq_abastecimento.NEXTVAL, v_paragem_id, 8870, 10011, 10);
 
-    -- Inativar uma configuração
+    -- Inativar uma configuraÃ§Ã£o
     UPDATE Configuracao_Compartimento SET DATA_FIM_CONFIGURACAO = SYSDATE - INTERVAL '2' MONTH
     WHERE ID_COMPARTIMENTO = 105 AND ID_PRODUTO = 8871;
 END;
 /
 
 
--- Dados para Nova Tabela Manutencao (VIEW J implícito, Q39, Q40)
+-- Dados para Nova Tabela Manutencao (VIEW J implÃ­cito, Q39, Q40)
 DECLARE
     v_manut_id NUMBER;
     v_paragem_id_manut NUMBER := NULL;
 BEGIN
      DBMS_OUTPUT.PUT_LINE('A gerar dados (amostra) para Manutencao...');
-     -- Manutenção Corretiva M787
+     -- ManutenÃ§Ã£o Corretiva M787
      INSERT INTO Manutencao (ID_MANUTENCAO, ID_MAQUINA, ID_FUNCIONARIO, DATA_HORA_INICIO, DATA_HORA_FIM, TIPO_MANUTENCAO, DESCRICAO_SERVICO, PECAS_USADAS, ESTADO_MAQUINA_ANTES, ESTADO_MAQUINA_DEPOIS)
-     VALUES(seq_manutencao.NEXTVAL, 787, 104, TO_TIMESTAMP('2025-03-05 15:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-03-05 16:30:00', 'YYYY-MM-DD HH24:MI:SS'), 'Corretiva', 'Reparação de sensor de moeda encravado.', 'Sensor XPT0-Rev2', 3, 1)
+     VALUES(seq_manutencao.NEXTVAL, 787, 104, TO_TIMESTAMP('2025-03-05 15:00:00', 'YYYY-MM-DD HH24:MI:SS'), TO_TIMESTAMP('2025-03-05 16:30:00', 'YYYY-MM-DD HH24:MI:SS'), 'Corretiva', 'ReparaÃ§Ã£o de sensor de moeda encravado.', 'Sensor XPT0-Rev2', 3, 1)
      RETURNING ID_MANUTENCAO INTO v_manut_id;
 
-     -- Manutenção Preventiva M1002 durante viagem
+     -- ManutenÃ§Ã£o Preventiva M1002 durante viagem
      BEGIN -- Bloco interno para tratar NO_DATA_FOUND opcionalmente
-       -- >> CORREÇÃO AQUI: CAST para TIMESTAMP <<
+       -- >> CORREÃ‡ÃƒO AQUI: CAST para TIMESTAMP <<
        SELECT MAX(ID_PARAGEM) INTO v_paragem_id_manut
        FROM Paragem
        WHERE ID_MAQUINA=1002 AND DATA_HORA_CHEGADA > CAST((SYSDATE - INTERVAL '5' DAY) AS TIMESTAMP);
      EXCEPTION
         WHEN NO_DATA_FOUND THEN
-           v_paragem_id_manut := NULL; -- Garante que é NULL se não encontrar paragem
+           v_paragem_id_manut := NULL; -- Garante que Ã© NULL se nÃ£o encontrar paragem
      END; -- Fim do bloco interno
 
-     -- Só insere se encontrou uma paragem (v_paragem_id_manut não é NULL) ou ajusta conforme necessário
+     -- SÃ³ insere se encontrou uma paragem (v_paragem_id_manut nÃ£o Ã© NULL) ou ajusta conforme necessÃ¡rio
      IF v_paragem_id_manut IS NOT NULL THEN
          INSERT INTO Manutencao (ID_MANUTENCAO, ID_MAQUINA, ID_FUNCIONARIO, ID_PARAGEM, DATA_HORA_INICIO, DATA_HORA_FIM, TIPO_MANUTENCAO, DESCRICAO_SERVICO)
-         VALUES(seq_manutencao.NEXTVAL, 1002, 101, v_paragem_id_manut, SYSTIMESTAMP - NUMTODSINTERVAL(1.94, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(1.92, 'DAY'), 'Preventiva', 'Limpeza geral e verificação de níveis.')
+         VALUES(seq_manutencao.NEXTVAL, 1002, 101, v_paragem_id_manut, SYSTIMESTAMP - NUMTODSINTERVAL(1.94, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(1.92, 'DAY'), 'Preventiva', 'Limpeza geral e verificaÃ§Ã£o de nÃ­veis.')
          RETURNING ID_MANUTENCAO INTO v_manut_id;
      ELSE
-         -- Opcional: Inserir a manutenção mesmo sem ID_PARAGEM associado
+         -- Opcional: Inserir a manutenÃ§Ã£o mesmo sem ID_PARAGEM associado
          INSERT INTO Manutencao (ID_MANUTENCAO, ID_MAQUINA, ID_FUNCIONARIO, ID_PARAGEM, DATA_HORA_INICIO, DATA_HORA_FIM, TIPO_MANUTENCAO, DESCRICAO_SERVICO)
-         VALUES(seq_manutencao.NEXTVAL, 1002, 101, NULL, SYSTIMESTAMP - NUMTODSINTERVAL(1.94, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(1.92, 'DAY'), 'Preventiva', 'Limpeza geral e verificação de níveis (sem Paragem ID).')
+         VALUES(seq_manutencao.NEXTVAL, 1002, 101, NULL, SYSTIMESTAMP - NUMTODSINTERVAL(1.94, 'DAY'), SYSTIMESTAMP - NUMTODSINTERVAL(1.92, 'DAY'), 'Preventiva', 'Limpeza geral e verificaÃ§Ã£o de nÃ­veis (sem Paragem ID).')
          RETURNING ID_MANUTENCAO INTO v_manut_id;
-         DBMS_OUTPUT.PUT_LINE('Aviso: Não foi encontrada Paragem recente para M1002. Manutenção inserida sem ID_PARAGEM.');
+         DBMS_OUTPUT.PUT_LINE('Aviso: NÃ£o foi encontrada Paragem recente para M1002. ManutenÃ§Ã£o inserida sem ID_PARAGEM.');
      END IF;
 
 END;
